@@ -45,7 +45,6 @@ def main() -> None:
     if args.show_shapes and all_shapes:
         _print_shape_report(all_shapes, all_scalars)
 
-    all_errors.sort()
     for err in all_errors:
         print(err)
 
@@ -98,6 +97,7 @@ def _process_file(
     errors: list[str] = []
     try:
         code = filepath.read_text(encoding="utf-8")
+        lines = code.splitlines()
         tree = ast.parse(code, filename=str(filepath))
     except SyntaxError as e:
         errors.append(f"{filepath}:{e.lineno}: error: [SyntaxError] {e.msg} ")
@@ -108,10 +108,15 @@ def _process_file(
 
     for error in checker.errors:
         line = error["line"]
-        col = error["col"]
+        line_idx = max(0, line - 1)
+        if line_idx < len(lines):
+            line_content = lines[line_idx]
+            if "# shpy: ignore" in line_content:
+                continue
+
         code = error["code"]
         msg = error["message"]
-        errors.append(f"{filepath}:{line}:{col}: error: [{code}] {msg}")
+        errors.append(f"{filepath}:{line}: error: [{code}] {msg}")
 
     return errors, checker.env.shapes, checker.env.scalar_values
 

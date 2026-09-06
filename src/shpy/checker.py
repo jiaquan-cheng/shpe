@@ -21,6 +21,7 @@ class Checker(ast.NodeVisitor):
         self.env = Environment()
         self.functions: dict[str, ast.FunctionDef] = {}
         self.errors: list[dict[str, Any]] = []
+        self.inlay_hints: list[dict[str, Any]] = []
         self.active_calls: set[str] = set()
 
         self.call_handlers = {
@@ -111,6 +112,8 @@ class Checker(ast.NodeVisitor):
             var_name, annotated_shape if annotated_shape is not None else inferred_shape
         )
 
+        if inferred_shape is not None:
+            self._log_hint(node, inferred_shape)
         if (
             annotated_shape is not None
             and inferred_shape is not None
@@ -138,6 +141,9 @@ class Checker(ast.NodeVisitor):
                     self.env.set_scalar(target.id, node.value.value)
 
         inferred_shape = self._infer_shape(node.value) if node.value else None
+
+        if inferred_shape is not None:
+            self._log_hint(node, inferred_shape)
 
         for target in node.targets:
             if isinstance(target, ast.Name):
@@ -1203,12 +1209,23 @@ class Checker(ast.NodeVisitor):
             err_type: The `ErrorCode` enum classifying the error type.
             message: A descriptive error message string.
         """
-        line_no = getattr(node, "lineno", 0)
+        col_offset = getattr(node, "col_offset", 0)
         self.errors.append(
             {
-                "line": line_no,
-                "col": getattr(node, "col_offset", 0),
+                "line": getattr(node, "lineno", 0),
+                "col": col_offset,
+                "end_col": getattr(node, "end_col_offset", col_offset),
                 "code": err_type.value,
                 "message": message,
+            }
+        )
+
+    def _log_hint(self, node: ast.AST, shape: tuple[Any, ...]) -> None:
+        """Logs inferred shape inlay hints for editor integration."""
+        self.inlay_hints.append(
+            {
+                "line": getattr(node, "lineno", 0),
+                "col": getattr(node, "end_col_offset", 0),
+                "shape": shape,
             }
         )

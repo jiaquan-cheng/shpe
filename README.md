@@ -2,32 +2,31 @@
 
 [![CI](https://github.com/jiaquan-cheng/shpy/actions/workflows/ci.yaml/badge.svg)](https://github.com/jiaquan-cheng/shpy/actions/workflows/ci.yaml)
 
-A lightweight static analyzer for validating NumPy array shapes at compile-time.
+A lightweight static analyzer for tracking and validating NumPy tensor shapes without running the code. 
 
-## Example
+## VS Code Extension
 
-`shpy` can catch shape mismatches before runtime, improving code safety and maintainability. If you choose to annotate your NumPy arrays with their expected shapes, `shpy` will validate them.
-```python
-from typing import Annotated
+### Preview
 
-a = np.ones((3, 2))
-b = np.zeros((2, 3))
-c: Annotated[np.ndarray, (3, 2)] = a.T
-err_elem = a + b
-err_matmul = a @ b.T
-```
+The VS Code extension provides real-time shape inference and error messages.
+
+![Shpy VS Code Extension Demo](assets/image.png)
+
+### Installation
+
+It is not yet published on VS Code Marketplace. To install the extension, clone the repository, install the package and build the VS Code extension:
+
 ```bash
-shpy examples/intro.py
-````
-```bash
-examples/intro.py:7:0: error: [Annotation] c annotated as (3, 2), but expression has the shape (2, 3). 
-examples/intro.py:8:11: error: [Elementwise] cannot combine a (3, 2) and b (2, 3) with element-wise operator. 
-examples/intro.py:9:13: error: [MatMul] cannot multiply a (3, 2) and b.T (3, 2): inner dimensions must match (2 != 3). 
-
-Found 3 error(s) across 1 file(s).
+git clone https://github.com/jiaquan-cheng/shpy.git
+cd shpy
+pip install -e .
+make vscode-package
 ```
+This compiles a `.vsix` file in the `shpy-vscode` directory, which you can install as an extension in VS Code.
 
-## Installation
+## Terminal
+
+### Installation
 
 Prerequisites: Python 3.13+
 
@@ -36,8 +35,8 @@ To install `shpy` directly:
 ```bash
 pip install git+https://github.com/jiaquan-cheng/shpy.git
 ```
-## Usage
 
+### Usage
 
 ```bash
 shpy path/to/your/file_or_directory
@@ -59,6 +58,7 @@ Checkout `examples/demo.py` for a more comprehensive demonstration of `shpy`'s c
 
 ## Limitations
 - Only supports a subset of NumPy arrays and functions.
+- Since shape inference for NumPy function is hard-coded, it may produce incorrect results for some functions.
 - No support for dynamic shape inference (e.g., shapes that depend on runtime values).
 - No control flow support (if, for, while).
 - No support for nested/recursive function definitions.
@@ -75,9 +75,11 @@ git clone https://github.com/jiaquan-cheng/shpy.git
 cd shpy
 make setup
 ```
-We would recommend to use the `--show-shapes` flag when developing to see the inferred shapes of all expressions in the code.
+
+We would recommend to using the VS Code extension or the `--show-shapes` flag to check the inferred shapes of your code while developing.
 
 - `make` : Runs the test suite and quality checks.
 - `make lint` : Runs [Ruff](https://docs.astral.sh/ruff/) and [Mypy](https://mypy-lang.org/) for code quality and type safety.
 - `make format` : Auto-format code.
 - `make test` : Runs [Pytest](https://pytest.org/).
+- `make clean` : Cleans up the project by removing build artifacts and caches.
