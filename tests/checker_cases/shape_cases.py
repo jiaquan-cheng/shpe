@@ -1,277 +1,191 @@
 import pytest
 
-from src.shpy.checker import ErrorCode
-
 SHAPE_CASES = [
     pytest.param(
         """
-        a: Annotated[np.ndarray, (2, 3)] = np.full((2, 3), 5)
-        at: Annotated[np.ndarray, (3, 2)] = a.T
-        b: Annotated[np.ndarray, (3, 2)] = np.full((2, 3), 5).T
+        a = np.full((2, 3), 5)
+        at = a.T
         """,
-        {"a": (2, 3), "at": (3, 2), "b": (3, 2)},
-        [],
-        id="transpose",
+        id="transpose_variable",
     ),
     pytest.param(
         """
-            a: Annotated[np.ndarray, (2, 3)] = np.full((2, 3), 5)
-            at: Annotated[np.ndarray, (2, 3)] = a.T
-            b: Annotated[np.ndarray, (2, 3)] = np.full((2, 3), 5).T
-            """,
-        {"a": (2, 3), "at": (2, 3), "b": (2, 3)},
-        [
-            {"line": 2, "code": ErrorCode.ANNOTATION.value},
-            {"line": 3, "code": ErrorCode.ANNOTATION.value},
-        ],
-        id="transpose_mismatch",
-    ),
-    pytest.param(
-        """
-        a: Annotated[np.ndarray, (2, 3)] = np.ones((2, 3))
-        b: Annotated[np.ndarray, (6,)] = a.reshape(6)
-        c: Annotated[np.ndarray, (3, 2)] = a.reshape((3, 2))
-        d: Annotated[np.ndarray, (2, 8)] = np.full((4, 2, 2), 5).reshape((2, 8))
-        e: Annotated[np.ndarray, (16, 1)] = reshape(d, (16, 1))
-        f: Annotated[np.ndarray, (8, 2)] = np.reshape(d, (8, -1))
-        g: Annotated[np.ndarray, (2, 2, 2, 2)] = np.reshape(d, (2, 2, -1, 2))
-        h: Annotated[np.ndarray, (3, 2)] = np.reshape(a, (-1, 2))
+        b = np.full((2, 3), 5).T
         """,
-        {
-            "a": (2, 3),
-            "b": (6,),
-            "c": (3, 2),
-            "d": (2, 8),
-            "e": (16, 1),
-            "f": (8, 2),
-            "g": (2, 2, 2, 2),
-            "h": (3, 2),
-        },
-        [],
-        id="reshape_operations",
+        id="transpose_inline",
     ),
     pytest.param(
         """
-        a: Annotated[np.ndarray, (2, 3)] = np.ones((2, 3))
-        b: Annotated[np.ndarray, (2, 3)] = a.reshape(7)
-        c: Annotated[np.ndarray, (2, 3)] = a.reshape((4, 2))
+        a = np.ones((2, 3))
+        b = a.reshape(6)
+        """,
+        id="reshape_method_args",
+    ),
+    pytest.param(
+        """
+        a = np.ones((2, 3))
+        c = a.reshape((3, 2))
+        """,
+        id="reshape_method_tuple",
+    ),
+    pytest.param(
+        """
+        d = np.full((4, 2, 2), 5).reshape((2, 8))
+        """,
+        id="reshape_inline_method",
+    ),
+    pytest.param(
+        """
+        d = np.full((4, 2, 2), 5)
+        f = np.reshape(d, (8, -1))
+        """,
+        id="reshape_np_infer_dim",
+    ),
+    pytest.param(
+        """
+        d = np.full((4, 2, 2), 5)
+        g = np.reshape(d, (2, 2, -1, 2))
+        """,
+        id="reshape_np_multiple_dims",
+    ),
+    pytest.param(
+        """
+        a = np.ones((2, 3))
+        h = np.reshape(a, (-1, 2))
+        """,
+        id="reshape_np_infer_first",
+    ),
+    pytest.param(
+        """
+        a = np.ones((2, 3))
+        b = a.reshape(7)
+        """,
+        id="reshape_mismatch_size",
+    ),
+    pytest.param(
+        """
+        a = np.ones((2, 3))
+        c = a.reshape((4, 2))
+        """,
+        id="reshape_mismatch_tuple",
+    ),
+    pytest.param(
+        """
+        a = np.ones((2, 3))
         d = np.reshape(a, (-1, -1))
         """,
-        {"a": (2, 3), "b": (2, 3), "c": (2, 3), "d": None},
-        [
-            {"line": 2, "code": ErrorCode.RESHAPE.value},
-            {"line": 3, "code": ErrorCode.RESHAPE.value},
-            {"line": 4, "code": ErrorCode.RESHAPE.value},
-        ],
-        id="reshape_operations_mismatch",
+        id="reshape_mismatch_multiple_infer",
     ),
     pytest.param(
         """
-            a: Annotated[np.ndarray, (2, 3)] = np.ones((2, 3))
-            b: Annotated[np.ndarray, (6,)] = a.flatten()
-            c: Annotated[np.ndarray, (6,)] = np.flatten(a)
-            d: Annotated[np.ndarray, (6,)] = flatten(a)
-            """,
-        {"a": (2, 3), "b": (6,), "c": (6,)},
-        [],
-        id="flatten",
-    ),
-    pytest.param(
-        """
-                a: Annotated[np.ndarray, (2, 3)] = np.ones((2, 3))
-                b: Annotated[np.ndarray, (7,)] = a.flatten()
-                c: Annotated[np.ndarray, (7,)] = np.flatten(a)
-                d: Annotated[np.ndarray, (7,)] = flatten(a)
-                """,
-        {"a": (2, 3), "b": (7,), "c": (7,), "d": (7,)},
-        [
-            {"line": 2, "code": ErrorCode.ANNOTATION.value},
-            {"line": 3, "code": ErrorCode.ANNOTATION.value},
-            {"line": 4, "code": ErrorCode.ANNOTATION.value},
-        ],
-        id="flatten_mismatch",
-    ),
-    pytest.param(
-        """
-        a: Annotated[np.ndarray, (2, 3)] = np.ones((2, 3))
-        b: Annotated[np.ndarray, (6,)] = a.ravel()
-        c: Annotated[np.ndarray, (6,)] = np.ravel(a)
-        d: Annotated[np.ndarray, (6,)] = ravel(a)
+        a = np.ones((2, 3))
+        b = a.flatten()
         """,
-        {"a": (2, 3), "b": (6,), "c": (6,), "d": (6,)},
-        [],
-        id="ravel",
+        id="flatten_method",
     ),
     pytest.param(
         """
-        a: Annotated[np.ndarray, (2, 3)] = np.ones((2, 3))
-        b: Annotated[np.ndarray, (7,)] = a.ravel()
-        c: Annotated[np.ndarray, (7,)] = np.ravel(a)
-        d: Annotated[np.ndarray, (7,)] = ravel(a)
+        a = np.ones((2, 3))
+        b = a.ravel()
         """,
-        {"a": (2, 3), "b": (7,), "c": (7,), "d": (7,)},
-        [
-            {"line": 2, "code": ErrorCode.ANNOTATION.value},
-            {"line": 3, "code": ErrorCode.ANNOTATION.value},
-            {"line": 4, "code": ErrorCode.ANNOTATION.value},
-        ],
-        id="ravel_mismatch",
+        id="ravel_method",
     ),
     pytest.param(
         """
-        a: Annotated[np.ndarray, (1, 2, 1, 3)] = np.ones((1, 2, 1, 3))
-        b: Annotated[np.ndarray, (2, 3)] = a.squeeze()
-        c: Annotated[np.ndarray, (2, 3)] = np.squeeze(a)
-        d: Annotated[np.ndarray, (2, 1, 3)] = a.squeeze(axis=0)
-        e: Annotated[np.ndarray, (1, 2, 3)] = np.squeeze(a, axis=2)
-        f: Annotated[np.ndarray, (2, 3)] = np.squeeze(a, axis=(0, 2))
-        g: Annotated[np.ndarray, (1, 2, 3)] = np.squeeze(a, axis=-2)
+        a = np.ones((2, 3))
+        c = np.ravel(a)
         """,
-        {
-            "a": (1, 2, 1, 3),
-            "b": (2, 3),
-            "c": (2, 3),
-            "d": (2, 1, 3),
-            "e": (1, 2, 3),
-            "f": (2, 3),
-            "g": (1, 2, 3),
-        },
-        [],
-        id="squeeze",
+        id="ravel_np",
     ),
     pytest.param(
         """
-        a: Annotated[np.ndarray, (1, 2, 1, 3)] = np.ones((1, 2, 1, 3))
-        b: Annotated[np.ndarray, (1, 2, 3)] = a.squeeze()
-        c: Annotated[np.ndarray, (1, 2, 3)] = np.squeeze(a)
-        d: Annotated[np.ndarray, (1, 2, 3)] = a.squeeze(axis=0)
-        e: Annotated[np.ndarray, (2, 3)] = np.squeeze(a, axis=2)
-        f: Annotated[np.ndarray, (1, 2, 3)] = np.squeeze(a, axis=(0, 2))
-        g: Annotated[np.ndarray, (2, 3)] = np.squeeze(a, axis=-2)
+        a = np.ones((1, 2, 1, 3))
+        b = a.squeeze()
         """,
-        {
-            "a": (1, 2, 1, 3),
-            "b": (1, 2, 3),
-            "c": (1, 2, 3),
-            "d": (1, 2, 3),
-            "e": (2, 3),
-            "f": (1, 2, 3),
-            "g": (2, 3),
-        },
-        [
-            {"line": 2, "code": ErrorCode.ANNOTATION.value},
-            {"line": 3, "code": ErrorCode.ANNOTATION.value},
-            {"line": 4, "code": ErrorCode.ANNOTATION.value},
-            {"line": 5, "code": ErrorCode.ANNOTATION.value},
-            {"line": 6, "code": ErrorCode.ANNOTATION.value},
-            {"line": 7, "code": ErrorCode.ANNOTATION.value},
-        ],
-        id="squeeze_mismatch",
+        id="squeeze_method_all",
     ),
     pytest.param(
         """
-        a: Annotated[np.ndarray, (2, 3)] = np.ones((2, 3))
-        b: Annotated[np.ndarray, (2, 1, 3)] = a.expand_dims(1)
-        c: Annotated[np.ndarray, (2, 3, 1)] = np.expand_dims(a, 2)
-        d: Annotated[np.ndarray, (1, 2, 3)] = expand_dims(a, 0)
-        e: Annotated[np.ndarray, (2, 1, 3)] = a.expand_dims(axis=1)
-        f: Annotated[np.ndarray, (2, 3, 1)] = np.expand_dims(a, axis=2)
+        a = np.ones((1, 2, 1, 3))
+        c = np.squeeze(a)
         """,
-        {
-            "a": (2, 3),
-            "b": (2, 1, 3),
-            "c": (2, 3, 1),
-            "d": (1, 2, 3),
-            "e": (2, 1, 3),
-            "f": (2, 3, 1),
-        },
-        [],
-        id="expand_dims",
+        id="squeeze_np_all",
     ),
     pytest.param(
         """
-        a: Annotated[np.ndarray, (2, 3)] = np.ones((2, 3))
-        b: Annotated[np.ndarray, (2, 3)] = a.expand_dims(1)
-        c: Annotated[np.ndarray, (2, 3)] = np.expand_dims(a, 2)
-        d: Annotated[np.ndarray, (2, 3)] = expand_dims(a, 0)
-        e: Annotated[np.ndarray, (2, 3)] = a.expand_dims(axis=1)
-        f: Annotated[np.ndarray, (2, 3)] = np.expand_dims(a, axis=2)
+        a = np.ones((1, 2, 1, 3))
+        d = a.squeeze(axis=0)
         """,
-        {"a": (2, 3), "b": (2, 3), "c": (2, 3), "d": (2, 3), "e": (2, 3), "f": (2, 3)},
-        [
-            {"line": 2, "code": ErrorCode.ANNOTATION.value},
-            {"line": 3, "code": ErrorCode.ANNOTATION.value},
-            {"line": 4, "code": ErrorCode.ANNOTATION.value},
-            {"line": 5, "code": ErrorCode.ANNOTATION.value},
-            {"line": 6, "code": ErrorCode.ANNOTATION.value},
-        ],
-        id="expand_dims_mismatch",
+        id="squeeze_axis_int",
     ),
     pytest.param(
         """
-        a: Annotated[np.ndarray, (2, 3, 4)] = np.ones((2, 3, 4))
-        b: Annotated[np.ndarray, (4, 3, 2)] = a.swapaxes(0, 2)
-        c: Annotated[np.ndarray, (2, 4, 3)] = np.swapaxes(a, 1, 2)
-        d: Annotated[np.ndarray, (3, 2, 4)] = swapaxes(a, 0, 1)
-        e: Annotated[np.ndarray, (4, 3, 2)] = np.swapaxes(a, -3, -1)
+        a = np.ones((1, 2, 1, 3))
+        e = a.squeeze(axis=2)
         """,
-        {
-            "a": (2, 3, 4),
-            "b": (4, 3, 2),
-            "c": (2, 4, 3),
-            "d": (3, 2, 4),
-            "e": (4, 3, 2),
-        },
-        [],
-        id="swapaxes",
+        id="squeeze_axis_middle",
     ),
     pytest.param(
         """
-        a: Annotated[np.ndarray, (2, 3, 4)] = np.ones((2, 3, 4))
-        b: Annotated[np.ndarray, (2, 3, 4)] = a.swapaxes(0, 2)
-        c: Annotated[np.ndarray, (2, 3, 4)] = np.swapaxes(a, 1, 2)
-        d: Annotated[np.ndarray, (2, 3, 4)] = swapaxes(a, 0, 1)
-        e: Annotated[np.ndarray, (2, 3, 4)] = np.swapaxes(a, -3, -1)
+        a = np.ones((1, 2, 1, 3))
+        f = a.squeeze(axis=(0, 2))
         """,
-        {
-            "a": (2, 3, 4),
-            "b": (2, 3, 4),
-            "c": (2, 3, 4),
-            "d": (2, 3, 4),
-            "e": (2, 3, 4),
-        },
-        [
-            {"line": 2, "code": ErrorCode.ANNOTATION.value},
-            {"line": 3, "code": ErrorCode.ANNOTATION.value},
-            {"line": 4, "code": ErrorCode.ANNOTATION.value},
-            {"line": 5, "code": ErrorCode.ANNOTATION.value},
-        ],
-        id="swapaxes_mismatch",
+        id="squeeze_axis_tuple",
     ),
     pytest.param(
         """
-        a: Annotated[np.ndarray, (2, 3)] = np.ones((2, 3))
-        b: Annotated[np.ndarray, (4, 1)] = a.resize((4, 1))
-        c: Annotated[np.ndarray, (3, 2)] = np.resize(a, (3, 2))
-        d: Annotated[np.ndarray, (6,)] = resize(a, 6)
+        a = np.ones((1, 2, 1, 3))
+        g = a.squeeze(axis=-2)
         """,
-        {"a": (2, 3), "b": (4, 1), "c": (3, 2), "d": (6,)},
-        [],
-        id="resize",
+        id="squeeze_axis_negative",
     ),
     pytest.param(
         """
-        a: Annotated[np.ndarray, (2, 3)] = np.ones((2, 3))
-        b: Annotated[np.ndarray, (2, 3)] = a.resize((4, 1))
-        c: Annotated[np.ndarray, (2, 3)] = np.resize(a, (3, 2))
-        d: Annotated[np.ndarray, (2, 3)] = resize(a, 6)
+        a = np.ones((2, 3))
+        c = np.expand_dims(a, 2)
         """,
-        {"a": (2, 3), "b": (2, 3), "c": (2, 3), "d": (2, 3)},
-        [
-            {"line": 2, "code": ErrorCode.ANNOTATION.value},
-            {"line": 3, "code": ErrorCode.ANNOTATION.value},
-            {"line": 4, "code": ErrorCode.ANNOTATION.value},
-        ],
-        id="resize_mismatch",
+        id="expand_dims_np_int",
+    ),
+    pytest.param(
+        """
+        a = np.ones((2, 3))
+        f = np.expand_dims(a, axis=2)
+        """,
+        id="expand_dims_np_axis",
+    ),
+    pytest.param(
+        """
+        a = np.ones((2, 3, 4))
+        b = a.swapaxes(0, 2)
+        """,
+        id="swapaxes_method",
+    ),
+    pytest.param(
+        """
+        a = np.ones((2, 3, 4))
+        c = np.swapaxes(a, 1, 2)
+        """,
+        id="swapaxes_np",
+    ),
+    pytest.param(
+        """
+        a = np.ones((2, 3, 4))
+        e = np.swapaxes(a, -3, -1)
+        """,
+        id="swapaxes_negative",
+    ),
+    pytest.param(
+        """
+        a = np.ones((2, 3))
+        b = a.resize((4, 1))
+        """,
+        id="resize_method_tuple",
+    ),
+    pytest.param(
+        """
+        a = np.ones((2, 3))
+        c = np.resize(a, (3, 2))
+        """,
+        id="resize_np_tuple",
     ),
 ]

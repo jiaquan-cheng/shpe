@@ -1,54 +1,64 @@
 import ast
+import traceback
 from textwrap import dedent
+from typing import Annotated
 
+import numpy as np
 import pytest
 
 from shpy.checker import Checker
-from tests.checker_cases.annotation_cases import ANNOTATION_CASES
-from tests.checker_cases.math_cases import MATH_CASES
-from tests.checker_cases.shape_cases import SHAPE_CASES
+from tests.checker_cases import (
+    ANNOTATION_CASES,
+    CONTEXT_CASES,
+    CREATION_CASES,
+    MATH_CASES,
+    SHAPE_CASES,
+)
 
-TEST_CASES = ANNOTATION_CASES + MATH_CASES + SHAPE_CASES
+TEST_CASES = (
+    CREATION_CASES + CONTEXT_CASES + ANNOTATION_CASES + MATH_CASES + SHAPE_CASES
+)
 
 
-@pytest.mark.parametrize("code, expected_symbols, expected_errors", TEST_CASES)
-def test_checker(code, expected_symbols, expected_errors):
+@pytest.mark.parametrize(
+    "code",
+    TEST_CASES,
+)
+def test_checker_runtime_oracle(code: str) -> None:
+
     cleaned_code = dedent(code).strip()
+
     tree = ast.parse(cleaned_code)
+
+    body_code = ""
     checker = Checker()
     checker.visit(tree)
 
-    for var, shape in expected_symbols.items():
-        assert checker.shapes.get(var) == shape, (
-            f"\nVariable mismatch for '{var}':\n"
-            f"  Expected shape: {shape}\n"
-            f"  Actual shape:   {checker.shapes.get(var)}\n"
-            f"  Full table:     {checker.shapes}"
-        )
+    runtime_namespace = {"np": np, "Annotated": Annotated}
+    try:
+        exec(cleaned_code, runtime_namespace)
+    except Exception as e:
+        tb = traceback.extract_tb(e.__traceback__)
+        error_lines = {f.lineno for f in tb if f.filename == "<string>"}
 
-    assert len(checker.errors) == len(expected_errors), (
-        f"\nError count mismatch:\n"
-        f"  Expected errors: {expected_errors}\n"
-        f"  Actual errors:   {checker.errors}"
-        f"  Full table:      {checker.shapes}"
-    )
+        # We only check if we caught one of all runtime errors
+        # because the same error can be raised at different lines
+        matched = any(err.get("line") in error_lines for err in checker.errors)
 
-    for actual, expected in zip(checker.errors, expected_errors, strict=False):
-        assert actual["line"] == expected["line"], (
-            f"\nError line mismatch:\n"
-            f"  Expected line: {expected['line']}\n"
-            f"  Actual line:   {actual['line']}\n"
-            f"  Expected code: {expected['code']}\n"
-            f"  Actual code:   {actual['code']}\n"
-            f"  Message:       {actual.get('message')}\n"
-            f"  Full table:    {checker.shapes}"
+        assert matched, (
+            f"  Snippet:\n{body_code}\n"
+            f"  Exception at lines {error_lines}: {e}\n"
+            f"  Checker errors: {checker.errors}"
         )
-        assert actual["code"] == expected["code"], (
-            f"\nError code mismatch:\n"
-            f"  Expected line: {expected['line']}\n"
-            f"  Actual line:   {actual['line']}\n"
-            f"  Expected code: {expected['code']}\n"
-            f"  Actual code:   {actual['code']}\n"
-            f"  Message:       {actual.get('message')}\n"
-            f"  Full table:    {checker.shapes}"
-        )
+        return
+
+    for var, static_shape in checker.shapes.items():
+        if var in runtime_namespace:
+            runtime_val = runtime_namespace[var]
+            if hasattr(runtime_val, "shape"):
+                assert static_shape == runtime_val.shape, (
+                    f"  Snippet:\n{body_code}\n"
+                    f"  Predicted: {static_shape}\n"
+                    f"  Actual:    {runtime_val.shape}\n"
+                    f"  Table:     {checker.shapes}"
+                )

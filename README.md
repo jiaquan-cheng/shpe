@@ -62,6 +62,7 @@ Checkout `examples/demo.py` for a more comprehensive demonstration of `shpy`'s c
 - No support for dynamic shape inference (e.g., shapes that depend on runtime values).
 - No control flow support (if, for, while).
 - No support for nested/recursive function definitions.
+- False negatives: To keep development simple,`shpy` identifies functions by suffix, so it may not trigger an error in cases like (`var.expand_dims` without `np.` prefix). 
 
 If you noticed any bugs or have any feature requests, please report them on [GitHub Issues](https://github.com/jiaquan-cheng/shpy/issues).
 
