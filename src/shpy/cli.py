@@ -106,6 +106,18 @@ def _process_file(
     checker = Checker()
     checker.visit(tree)
 
+    for warning in checker.warnings:
+        line = warning["line"]
+        line_idx = max(0, line - 1)
+        if line_idx < len(lines):
+            line_content = lines[line_idx]
+            if "# shpy: ignore" in line_content:
+                continue
+
+        code = warning["code"]
+        msg = warning["message"]
+        errors.append(f"{filepath}:{line}: warning: [{code}] {msg}")
+
     for error in checker.errors:
         line = error["line"]
         line_idx = max(0, line - 1)

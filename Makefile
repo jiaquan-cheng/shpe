@@ -12,6 +12,9 @@ lint:
 	uv run ruff check src tests --fix
 	uv run mypy -p shpy
 
+unsafe:
+	uv run ruff check src tests --fix --unsafe-fixes
+
 format:
 	uv run ruff format src tests
 

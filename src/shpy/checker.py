@@ -21,6 +21,7 @@ class Checker(ast.NodeVisitor):
         self.env = Environment()
         self.functions: dict[str, ast.FunctionDef] = {}
         self.errors: list[dict[str, Any]] = []
+        self.warnings: list[dict[str, Any]] = []
         self.inlay_hints: list[dict[str, Any]] = []
         self.active_calls: set[str] = set()
 
@@ -154,7 +155,44 @@ class Checker(ast.NodeVisitor):
         if self.env.parent is None:
             self.functions[node.name] = node
 
-        # no generic visit, evaluate function only when called
+        self.generic_visit(node)
+
+    def visit_If(self, node: ast.If) -> None:
+        """Handles if statements by issuing a warning and continuing traversal."""
+        test_str = ast.unparse(node.test).replace('"', "'")
+
+        # Skip warning for the standard main block
+        if test_str != "__name__ == '__main__'":
+            self._log_warning(
+                node,
+                "Control flow (if statement) detected. "
+                "Shape inference may be imprecise.",
+            )
+        self.generic_visit(node)
+
+    def visit_For(self, node: ast.For) -> None:
+        """Handles for loops by issuing a warning and continuing traversal."""
+        self._log_warning(
+            node,
+            "Control flow (for loop) detected. Shape inference may be imprecise.",
+        )
+        self.generic_visit(node)
+
+    def visit_While(self, node: ast.While) -> None:
+        """Handles while loops by issuing a warning and continuing traversal."""
+        self._log_warning(
+            node,
+            "Control flow (while loop) detected. Shape inference may be imprecise.",
+        )
+        self.generic_visit(node)
+
+    def visit_AsyncFor(self, node: ast.AsyncFor) -> None:
+        """Handles async for loops."""
+        self._log_warning(
+            node,
+            "Control flow (async for loop) detected. Shape inference may be imprecise.",
+        )
+        self.generic_visit(node)
 
     # ==========================================
     # 2. Core Inference
@@ -186,6 +224,9 @@ class Checker(ast.NodeVisitor):
             node.value, (int, float, bool)
         ):
             return ()
+
+        if isinstance(node, (ast.Tuple, ast.List)):
+            return self._extract_literal_shape(node)
 
         if isinstance(node, ast.Attribute):
             return self._infer_attribute_shape(node)
@@ -535,6 +576,15 @@ class Checker(ast.NodeVisitor):
         Returns:
             The target resized shape tuple, or None.
         """
+        if (
+            isinstance(node.func, ast.Attribute)
+            and self._infer_shape(node.func.value) is not None
+        ):
+            self._log_warning(
+                node,
+                "In-place resize detected. The shape may not be accurately inferred.",
+            )
+
         shape, args = self._extract_call_target(node)
         if shape is None or not args:
             return None
@@ -1063,6 +1113,11 @@ class Checker(ast.NodeVisitor):
         Returns:
             A tuple representing the multi-dimensional structure.
         """
+        if isinstance(node, ast.Name):
+            shape = self.env.get_shape(node.id)
+            if shape is not None:
+                return shape
+            return ()
         if not isinstance(node, (ast.List, ast.Tuple)):
             return ()
         if not node.elts:
@@ -1216,6 +1271,23 @@ class Checker(ast.NodeVisitor):
                 "col": col_offset,
                 "end_col": getattr(node, "end_col_offset", col_offset),
                 "code": err_type.value,
+                "message": message,
+            }
+        )
+
+    def _log_warning(self, node: ast.AST, message: str) -> None:
+        """Logs structured diagnostic warnings matching test assertion requirements.
+
+        Args:
+            node: The AST node where the warning occurred.
+            message: A descriptive warning message string.
+        """
+        col_offset = getattr(node, "col_offset", 0)
+        self.warnings.append(
+            {
+                "line": getattr(node, "lineno", 0),
+                "col": col_offset,
+                "end_col": getattr(node, "end_col_offset", col_offset),
                 "message": message,
             }
         )

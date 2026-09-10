@@ -1,4 +1,5 @@
 import ast
+from typing import Any
 
 from lsprotocol.types import (
     TEXT_DOCUMENT_DID_CHANGE,
@@ -53,28 +54,36 @@ def validate(ls: LanguageServer, document: TextDocument) -> None:
     checker.visit(tree)
 
     diagnostics = []
-    for err in checker.errors:
-        line_idx = max(0, err["line"] - 1)
 
-        if line_idx < len(lines):
-            line_content = lines[line_idx]
-            if "# shpy: ignore" in line_content:
-                continue
+    def add_diagnostics(
+        entries: list[dict[str, Any]], severity: DiagnosticSeverity
+    ) -> None:
+        for entry in entries:
+            line_idx = max(0, entry["line"] - 1)
 
-        col = max(0, err["col"])
-        end_col = max(0, err["end_col"])
+            if line_idx < len(lines):
+                line_content = lines[line_idx]
+                if "# shpy: ignore" in line_content:
+                    continue
 
-        diag = Diagnostic(
-            range=Range(
-                start=Position(line=line_idx, character=col),
-                end=Position(line=line_idx, character=end_col),
-            ),
-            message=err["message"],
-            severity=DiagnosticSeverity.Error,
-            source="shpy",
-            code=err["code"],
-        )
-        diagnostics.append(diag)
+            col = max(0, entry["col"])
+            end_col = max(0, entry["end_col"])
+
+            diag = Diagnostic(
+                range=Range(
+                    start=Position(line=line_idx, character=col),
+                    end=Position(line=line_idx, character=end_col),
+                ),
+                message=entry["message"],
+                severity=severity,
+                source="shpy",
+                code=entry.get("code"),
+            )
+            diagnostics.append(diag)
+
+    # Collect both errors and warnings
+    add_diagnostics(checker.errors, DiagnosticSeverity.Error)
+    # add_diagnostics(checker.warnings, DiagnosticSeverity.Warning)
 
     ls.text_document_publish_diagnostics(
         PublishDiagnosticsParams(uri=document.uri, diagnostics=diagnostics)
