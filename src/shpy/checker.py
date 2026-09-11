@@ -155,44 +155,31 @@ class Checker(ast.NodeVisitor):
         if self.env.parent is None:
             self.functions[node.name] = node
 
-        self.generic_visit(node)
+        # no generic vists as they could overwrite function args in local scope
 
     def visit_If(self, node: ast.If) -> None:
-        """Handles if statements by issuing a warning and continuing traversal."""
+        """Handles if statements by tainting variables modified inside branches."""
         test_str = ast.unparse(node.test).replace('"', "'")
 
-        # Skip warning for the standard main block
-        if test_str != "__name__ == '__main__'":
-            self._log_warning(
-                node,
-                "Control flow (if statement) detected. "
-                "Shape inference may be imprecise.",
-            )
-        self.generic_visit(node)
+        # Evaluate normally for the standard main block
+        if test_str == "__name__ == '__main__'":
+            self.generic_visit(node)
+        else:
+            self._visit_tainted_block(node.body)
+            if node.orelse:
+                self._visit_tainted_block(node.orelse)
 
     def visit_For(self, node: ast.For) -> None:
-        """Handles for loops by issuing a warning and continuing traversal."""
-        self._log_warning(
-            node,
-            "Control flow (for loop) detected. Shape inference may be imprecise.",
-        )
-        self.generic_visit(node)
+        """Handles for loops by tainting variables modified inside the loop."""
+        self._visit_tainted_block(node.body)
 
     def visit_While(self, node: ast.While) -> None:
-        """Handles while loops by issuing a warning and continuing traversal."""
-        self._log_warning(
-            node,
-            "Control flow (while loop) detected. Shape inference may be imprecise.",
-        )
-        self.generic_visit(node)
+        """Handles while loops by tainting variables modified inside the loop."""
+        self._visit_tainted_block(node.body)
 
     def visit_AsyncFor(self, node: ast.AsyncFor) -> None:
         """Handles async for loops."""
-        self._log_warning(
-            node,
-            "Control flow (async for loop) detected. Shape inference may be imprecise.",
-        )
-        self.generic_visit(node)
+        self._visit_tainted_block(node.body)
 
     # ==========================================
     # 2. Core Inference
@@ -362,18 +349,14 @@ class Checker(ast.NodeVisitor):
         """
         old_shape, args = self._extract_call_target(node)
 
-        if not args or old_shape is None:
-            receiver_node = (
-                node.func.value if isinstance(node.func, ast.Attribute) else None
-            )
+        if old_shape is None:
+            return None
+
+        if not args:
             self._log_error(
                 node,
                 ErrorCode.RESHAPE,
-                (
-                    f"could not infer original shape: "
-                    f"{ast.unparse(receiver_node) if receiver_node else 'unknown'} "
-                    f"shape not found and missing argument "
-                ),
+                "reshape called without a new shape argument. ",
             )
             return None
 
@@ -381,11 +364,6 @@ class Checker(ast.NodeVisitor):
         new_shape = self._extract_expr_shape(new_shape_arg)
 
         if new_shape is None:
-            self._log_error(
-                node,
-                ErrorCode.RESHAPE,
-                f"could not infer new shape: {ast.unparse(new_shape_arg)} ",
-            )
             return None
 
         if any(isinstance(d, str) or d < 0 for d in old_shape):
@@ -999,7 +977,7 @@ class Checker(ast.NodeVisitor):
             target_shape = self._infer_shape(node.args[0])
             return target_shape, list(node.args[1:])
 
-        return None, []
+        return None, list(node.args)
 
     def _extract_dim_value(self, node: ast.AST | None) -> int | str | None:
         """Extracts a scalar integer/float value from an AST node for dim calculations.
@@ -1032,7 +1010,10 @@ class Checker(ast.NodeVisitor):
         if isinstance(node, ast.Name):
             value = self.env.get_scalar(node.id)
 
-            if value is None or not float(value).is_integer():
+            if value is None:
+                return None
+
+            if value is not None and not float(value).is_integer():
                 self._log_error(
                     node,
                     ErrorCode.VALUE,
@@ -1255,6 +1236,20 @@ class Checker(ast.NodeVisitor):
             effective_len = math.ceil((start - stop) / abs(step_val))
 
         return max(0, effective_len)
+
+    def _visit_tainted_block(self, body: list[ast.stmt]) -> None:
+        """Walks a block of code and forces any assigned variables to None (Unknown).
+
+        Args:
+            body: A list of AST statements representing the code block.
+        """
+        for stmt in body:
+            self.visit(stmt)
+            for target in ast.walk(stmt):
+                if isinstance(target, ast.Name) and isinstance(target.ctx, ast.Store):
+                    self.env.set_shape(target.id, None)
+                    if target.id in self.env.scalar_values:
+                        del self.env.scalar_values[target.id]
 
     def _log_error(self, node: ast.AST, err_type: ErrorCode, message: str) -> None:
         """Logs structured diagnostic errors matching test assertion requirements.
