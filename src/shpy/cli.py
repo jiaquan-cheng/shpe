@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from shpy.checker import Checker
+from shpy.environment import ShapeState
 
 try:
     __version__ = importlib.metadata.version("shpy")
@@ -31,8 +32,8 @@ def main() -> None:
 
     files = discover_files(args.paths)
     all_errors: list[str] = []
-    all_shapes: dict[Path, dict[str, tuple[Any, ...] | None]] = {}
-    all_scalars: dict[Path, dict[str, int | float]] = {}
+    all_shapes: dict[Path, dict[str, tuple[Any, ...] | ShapeState]] = {}
+    all_scalars: dict[Path, dict[str, int | float | ShapeState]] = {}
 
     for filepath in files:
         file_errors, shapes, scalars = _process_file(filepath)
@@ -84,7 +85,11 @@ def discover_files(paths: list[Path]) -> list[Path]:
 
 def _process_file(
     filepath: Path,
-) -> tuple[list[str], dict[str, tuple[Any, ...] | None], dict[str, int | float]]:
+) -> tuple[
+    list[str],
+    dict[str, tuple[Any, ...] | ShapeState],
+    dict[str, int | float | ShapeState],
+]:
     """Processes a single source file, running syntax checks and shape analysis.
 
     Args:
@@ -100,7 +105,7 @@ def _process_file(
         lines = code.splitlines()
         tree = ast.parse(code, filename=str(filepath))
     except SyntaxError as e:
-        errors.append(f"{filepath}:{e.lineno}: error: [SyntaxError] {e.msg} ")
+        errors.append(f"{filepath}:{e.lineno}: [SyntaxError] {e.msg} ")
         return errors, {}, {}
 
     checker = Checker()
@@ -128,14 +133,14 @@ def _process_file(
 
         code = error["code"]
         msg = error["message"]
-        errors.append(f"{filepath}:{line}: error: [{code}] {msg}")
+        errors.append(f"{filepath}:{line}: [{code}] {msg}")
 
     return errors, checker.env.shapes, checker.env.scalar_values
 
 
 def _print_shape_report(
-    all_shapes: dict[Path, dict[str, tuple[Any, ...] | None]],
-    all_scalars: dict[Path, dict[str, int | float]],
+    all_shapes: dict[Path, dict[str, tuple[Any, ...] | ShapeState]],
+    all_scalars: dict[Path, dict[str, int | float | ShapeState]],
 ) -> None:
     """Prints a formatted report of all inferred shapes and scalar values across files.
 
@@ -153,17 +158,26 @@ def _print_shape_report(
         if scalars:
             print("  Scalars:")
             for name, val in sorted(scalars.items()):
-                print(f"    - {name} = {val}")
+                val_str = "unknown" if val is ShapeState.UNKNOWN else val
+                print(f"    - {name} = {val_str}")
 
         if symbols:
             print("  Shapes:")
-            symbols_with_no_shape = []
+            symbols_with_no_shape: list[str] = []
+            symbols_with_unknown_shape: list[str] = []
             for var_name, shape in sorted(symbols.items()):
-                if shape is not None:
+                if shape is ShapeState.UNKNOWN:
+                    symbols_with_unknown_shape.append(var_name)
+                elif shape is not None:
                     print(f"    - {var_name}: {shape}")
                 else:
                     symbols_with_no_shape.append(var_name)
 
+            if symbols_with_unknown_shape:
+                print(
+                    "    - unknown shape (tainted) for: "
+                    f"{', '.join(symbols_with_unknown_shape)}"
+                )
             if symbols_with_no_shape:
                 print(
                     f"    - no shape inferred for: {', '.join(symbols_with_no_shape)}"

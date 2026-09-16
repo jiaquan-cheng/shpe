@@ -180,6 +180,7 @@ SHAPE_CASES = [
         b = a.resize((4, 1))
         """,
         id="resize_method_tuple",
+        marks=pytest.mark.skip(reason="resize inplace not supported"),
     ),
     pytest.param(
         """

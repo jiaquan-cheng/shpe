@@ -81,9 +81,8 @@ def validate(ls: LanguageServer, document: TextDocument) -> None:
             )
             diagnostics.append(diag)
 
-    # Collect both errors and warnings
     add_diagnostics(checker.errors, DiagnosticSeverity.Error)
-    # add_diagnostics(checker.warnings, DiagnosticSeverity.Warning)
+    add_diagnostics(checker.warnings, DiagnosticSeverity.Warning)
 
     ls.text_document_publish_diagnostics(
         PublishDiagnosticsParams(uri=document.uri, diagnostics=diagnostics)

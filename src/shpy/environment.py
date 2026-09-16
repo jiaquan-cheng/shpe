@@ -1,34 +1,57 @@
+from enum import Enum
 from typing import Any
 
 
+class ShapeState(Enum):
+    UNKNOWN = "UNKNOWN"
+
+
 class Environment:
-    def __init__(self, parent: "Environment | None" = None) -> None:
-        """Manages global and local variable shapes and scalar values."""
+    def __init__(self) -> None:
+        shapes: dict[str, tuple[Any, ...] | ShapeState] = {}
+        scalar_values: dict[str, int | float | ShapeState] = {}
+        self.stack: list[dict[str, Any]] = [
+            {"shapes": shapes, "scalar_values": scalar_values}
+        ]
 
-        self.parent = parent
-        self.shapes: dict[str, tuple[Any, ...] | None] = {}
-        self.scalar_values: dict[str, int | float] = {}
+    @property
+    def shapes(self) -> dict[str, tuple[Any, ...] | ShapeState]:
+        return self.stack[-1]["shapes"]
 
-    def create_child(self) -> "Environment":
-        """Spawns an environment for local variables and shapes."""
-        return Environment(parent=self)
+    @property
+    def scalar_values(self) -> dict[str, int | float | ShapeState]:
+        return self.stack[-1]["scalar_values"]
 
-    def get_shape(self, name: str) -> tuple[Any, ...] | None:
-        if name in self.shapes:
-            return self.shapes[name]
-        if self.parent is not None:
-            return self.parent.get_shape(name)
+    def __len__(self) -> int:
+        return len(self.stack)
+
+    def get_shape(self, name: str) -> tuple[Any, ...] | ShapeState | None:
+        for frame in reversed(self.stack):
+            if name in frame["shapes"]:
+                return frame["shapes"][name]
         return None
 
-    def set_shape(self, name: str, shape: tuple[Any, ...] | None) -> None:
-        self.shapes[name] = shape
-
-    def get_scalar(self, name: str) -> int | float | None:
-        if name in self.scalar_values:
-            return self.scalar_values[name]
-        if self.parent is not None:
-            return self.parent.get_scalar(name)
+    def get_scalar(self, name: str) -> int | float | ShapeState | None:
+        for frame in reversed(self.stack):
+            if name in frame["scalar_values"]:
+                return frame["scalar_values"][name]
         return None
 
-    def set_scalar(self, name: str, value: float) -> None:
-        self.scalar_values[name] = value
+    def set_shape(self, name: str, shape: tuple[Any, ...] | ShapeState) -> None:
+        self.stack[-1]["shapes"][name] = shape
+
+    def set_scalar(self, name: str, value: int | float | ShapeState) -> None:
+        self.stack[-1]["scalar_values"][name] = value
+
+    def push_child(self) -> None:
+        """Creates a new child environment for local variables and shapes."""
+        shapes: dict[str, tuple[Any, ...] | ShapeState] = {}
+        scalar_values: dict[str, int | float | ShapeState] = {}
+        self.stack.append({"shapes": shapes, "scalar_values": scalar_values})
+
+    def pop_child(self) -> None:
+        """Removes the most recent child environment."""
+        if len(self.stack) > 1:
+            self.stack.pop()
+        else:
+            raise RuntimeError("Cannot pop the root environment.")

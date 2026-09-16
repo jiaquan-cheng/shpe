@@ -28,8 +28,6 @@ def checker_runtime_oracle(code: str) -> None:
 
     checker = Checker()
     checker.visit(tree)
-    if checker.warnings:
-        pytest.skip(f"Warnings found: {checker.warnings}")
 
     runtime_namespace = {"np": np, "Annotated": Annotated}
     try:
