@@ -113,10 +113,10 @@ class Checker(ast.NodeVisitor):
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         """Tracks custom function definitions."""
-        if len(self.env) == 1:
-            self.resolver.functions[node.name] = node
-
-        # no generic vists as they could overwrite function args in local scope
+        self.env.set_function(node.name, node)
+        self.env.push_child()
+        self.resolver.user_function_def(node)
+        self.env.pop_child()
 
     def visit_If(self, node: ast.If) -> None:
         """Handles if statements by tainting variables modified inside branches."""

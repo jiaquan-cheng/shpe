@@ -23,8 +23,37 @@ class Diagnostics:
         self.errors: list[dict[str, Any]] = []
         self.warnings: list[dict[str, Any]] = []
         self.inlay_hints: list[dict[str, Any]] = []
+        self.active_error_collection = True
+        self.active_warning_collection = True
+        self.active_hint_collection = True
+
+    def deactivate_hints(self) -> None:
+        """Deactivate inlay hints collection."""
+        self.active_hint_collection = False
+
+    def activate_hints(self) -> None:
+        """Activate inlay hints collection."""
+        self.active_hint_collection = True
+
+    def deactivate_errors(self) -> None:
+        """Deactivate error collection."""
+        self.active_error_collection = False
+
+    def activate_errors(self) -> None:
+        """Activate error collection."""
+        self.active_error_collection = True
+
+    def deactivate_warnings(self) -> None:
+        """Deactivate warning collection."""
+        self.active_warning_collection = False
+
+    def activate_warnings(self) -> None:
+        """Activate warning collection."""
+        self.active_warning_collection = True
 
     def error(self, node: ast.AST, code: ErrorCode, message: str) -> None:
+        if not self.active_error_collection:
+            return
         line, col, end_col = _position(node)
         self.errors.append(
             {
@@ -37,12 +66,16 @@ class Diagnostics:
         )
 
     def warning(self, node: ast.AST, message: str) -> None:
+        if not self.active_warning_collection:
+            return
         line, col, end_col = _position(node)
         self.warnings.append(
             {"line": line, "col": col, "end_col": end_col, "message": message}
         )
 
     def hint(self, node: ast.AST, shape: tuple[Any, ...]) -> None:
+        if not self.active_hint_collection:
+            return
         self.inlay_hints.append(
             {
                 "line": getattr(node, "lineno", 0),

@@ -88,4 +88,24 @@ CONTEXT_CASES = [
         """,
         id="context_func_default_arg_overridden",
     ),
+    pytest.param(
+        """
+        def func(y):
+            def inner_func(x):
+                return x
+            return inner_func(y)
+        res = func(np.zeros((4, 4)))
+        """,
+        id="nested_func_def",
+    ),
+    pytest.param(
+        """
+        def func():
+            def inner_func(x=np.zeros((2, 3))):
+                return x
+            return inner_func()
+        res = func()
+        """,
+        id="nested_func_default_arg",
+    ),
 ]

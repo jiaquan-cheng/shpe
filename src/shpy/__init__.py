@@ -1,3 +1,5 @@
-from .checker import Checker, ErrorCode
+from .checker import Checker
+from .diagnostics import ErrorCode
+from .environment import ShapeState
 
-__all__ = ["Checker", "ErrorCode"]
+__all__ = ["Checker", "ErrorCode", "ShapeState"]

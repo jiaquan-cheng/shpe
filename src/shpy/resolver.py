@@ -25,7 +25,6 @@ class Resolver:
         self.extractor: Extractor = extractor
         self.env: Environment = env
         self.diagnostics: Diagnostics = diagnostics
-        self.functions: dict[str, ast.FunctionDef] = {}
         self.active_calls: set[str] = set()
         self.handler = Handler(self.extractor, self.diagnostics, self)
         self.walker: StatementWalker = walker
@@ -91,8 +90,9 @@ class Resolver:
         func_name = ast.unparse(node.func)
 
         # Check if it's a user-defined function call
-        if func_name in self.functions:
-            return self.user_function_call(node, self.functions[func_name])
+        function = self.env.get_function(func_name)
+        if function is not None:
+            return self.user_function_call(node, function)
 
         for suffix in self.call_handlers:
             if func_name.endswith(suffix):
@@ -138,10 +138,46 @@ class Resolver:
             return handler(node, left_shape, right_shape)
         return None
 
+    def user_function_def(
+        self, node: ast.FunctionDef
+    ) -> tuple[int | str, ...] | ShapeState | None:
+        """Handels user-defined function calls.
+
+        Args:
+            node: The `ast.Call` node representing the invocation.
+            func_node: The `ast.FunctionDef` node of the target function.
+
+        Returns:
+            The inferred return shape tuple, or None if uninferrable.
+        """
+
+        func_name = node.name
+
+        # does not handle recursion
+        if func_name in self.active_calls:
+            return None
+
+        self.active_calls.add(func_name)
+
+        # seperates local and gloabl variables
+        self.env.push_child()
+
+        try:
+            self.bind_function_arguments(None, node)
+
+            if node.returns:
+                return self.extractor.annotation_shape(node.returns)
+
+            return self.function_body_shape(node.body)
+        finally:
+            self.env.pop_child()
+            self.active_calls.remove(func_name)
+
     def user_function_call(
         self, node: ast.Call, func_node: ast.FunctionDef
     ) -> tuple[int | str, ...] | ShapeState | None:
-        """Infers the shape returned by a user-defined function call.
+        """Handels user-defined function calls.
+
         Args:
             node: The `ast.Call` node representing the invocation.
             func_node: The `ast.FunctionDef` node of the target function.
@@ -160,7 +196,7 @@ class Resolver:
 
         # seperates local and gloabl variables
         self.env.push_child()
-
+        self.diagnostics.deactivate_hints()
         try:
             self.bind_function_arguments(node, func_node)
 
@@ -171,6 +207,7 @@ class Resolver:
         finally:
             self.env.pop_child()
             self.active_calls.remove(func_name)
+            self.diagnostics.activate_hints()
 
     def function_body_shape(
         self, body: list[ast.stmt]
@@ -188,21 +225,29 @@ class Resolver:
             self.walker.visit(stmt)
             if isinstance(stmt, ast.Return):
                 inferred_return_shape = self.shape(stmt.value)
+            if (
+                inferred_return_shape is not None
+                and inferred_return_shape is not ShapeState.UNKNOWN
+            ):
+                self.diagnostics.hint(stmt, inferred_return_shape)
         return inferred_return_shape
 
     def bind_function_arguments(
-        self, node: ast.Call, func_node: ast.FunctionDef
+        self, node: ast.Call | None, func_node: ast.FunctionDef
     ) -> None:
         """Binds positional, default, and annotated arg shapes to the local func scope.
 
         Args:
             node: The `ast.Call` node supplying the argument values.
+            If `None`, no arguments are provided.
             func_node: The `ast.FunctionDef` node being invoked.
         """
         args_args = func_node.args.args
         defaults = func_node.args.defaults
         num_required = len(args_args) - len(defaults)
-        provided_shapes = [self.shape(arg) for arg in node.args]
+        provided_shapes = (
+            [self.shape(arg) for arg in node.args] if node is not None else []
+        )
 
         for i, param in enumerate(args_args):
             arg_shape = provided_shapes[i] if i < len(provided_shapes) else None
@@ -223,13 +268,16 @@ class Resolver:
                     and expected_shape != arg_shape
                 ):
                     self.diagnostics.error(
-                        node,
+                        node if node is not None else func_node,
                         ErrorCode.ANNOTATION,
                         (
                             f"Argument annotated as {expected_shape}, "
                             f"but expression has the shape {arg_shape}. "
                         ),
                     )
+            # hint is not end of line, so we leave it out until it is fixed
+            # if arg_shape is not None and arg_shape is not ShapeState.UNKNOWN:
+            #     self.diagnostics.hint(func_node, arg_shape)
 
     def subscript_shape(
         self, node: ast.Subscript

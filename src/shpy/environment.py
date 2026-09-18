@@ -1,3 +1,4 @@
+import ast
 from enum import Enum
 from typing import Any
 
@@ -8,11 +9,8 @@ class ShapeState(Enum):
 
 class Environment:
     def __init__(self) -> None:
-        shapes: dict[str, tuple[Any, ...] | ShapeState] = {}
-        scalar_values: dict[str, int | float | ShapeState] = {}
-        self.stack: list[dict[str, Any]] = [
-            {"shapes": shapes, "scalar_values": scalar_values}
-        ]
+        self.stack: list[dict[str, Any]] = []
+        self.push_child()  # Initialize the root environment
 
     @property
     def shapes(self) -> dict[str, tuple[Any, ...] | ShapeState]:
@@ -21,6 +19,10 @@ class Environment:
     @property
     def scalar_values(self) -> dict[str, int | float | ShapeState]:
         return self.stack[-1]["scalar_values"]
+
+    @property
+    def functions(self) -> dict[str, Any]:
+        return self.stack[-1]["functions"]
 
     def __len__(self) -> int:
         return len(self.stack)
@@ -37,17 +39,29 @@ class Environment:
                 return frame["scalar_values"][name]
         return None
 
+    def get_function(self, name: str) -> ast.FunctionDef | None:
+        for frame in reversed(self.stack):
+            if name in frame["functions"]:
+                return frame["functions"][name]
+        return None
+
     def set_shape(self, name: str, shape: tuple[Any, ...] | ShapeState) -> None:
         self.stack[-1]["shapes"][name] = shape
 
     def set_scalar(self, name: str, value: int | float | ShapeState) -> None:
         self.stack[-1]["scalar_values"][name] = value
 
+    def set_function(self, name: str, func: Any) -> None:
+        self.stack[-1]["functions"][name] = func
+
     def push_child(self) -> None:
         """Creates a new child environment for local variables and shapes."""
         shapes: dict[str, tuple[Any, ...] | ShapeState] = {}
         scalar_values: dict[str, int | float | ShapeState] = {}
-        self.stack.append({"shapes": shapes, "scalar_values": scalar_values})
+        functions: dict[str, ast.FunctionDef] = {}
+        self.stack.append(
+            {"shapes": shapes, "scalar_values": scalar_values, "functions": functions}
+        )
 
     def pop_child(self) -> None:
         """Removes the most recent child environment."""
