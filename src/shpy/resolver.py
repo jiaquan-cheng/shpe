@@ -245,20 +245,31 @@ class Resolver:
         args_args = func_node.args.args
         defaults = func_node.args.defaults
         num_required = len(args_args) - len(defaults)
-        provided_shapes = (
-            [self.shape(arg) for arg in node.args] if node is not None else []
-        )
+        provided_args = node.args if node is not None else []
 
         for i, param in enumerate(args_args):
-            arg_shape = provided_shapes[i] if i < len(provided_shapes) else None
+            expr_node = None
+            scalar_val = None
+            if i < len(provided_args):
+                expr_node = provided_args[i]
+            elif i >= num_required:
+                expr_node = defaults[i - num_required]
 
-            if arg_shape is None and i >= num_required:
-                arg_shape = self.shape(defaults[i - num_required])
-
+            arg_shape = self.shape(expr_node) if expr_node is not None else None
             if arg_shape is not None:
                 self.env.set_shape(param.arg, arg_shape)
             else:
                 self.env.set_shape(param.arg, ShapeState.UNKNOWN)
+
+            if isinstance(expr_node, ast.Constant) and isinstance(
+                expr_node.value, (int, float)
+            ):
+                scalar_val = expr_node.value
+            if scalar_val is not None:
+                if hasattr(self.env.scalar_values, "set"):
+                    self.env.scalar_values.set(param.arg, scalar_val)
+                else:
+                    self.env.scalar_values[param.arg] = scalar_val
 
             if param.annotation and arg_shape and arg_shape is not ShapeState.UNKNOWN:
                 expected_shape = self.extractor.annotation_shape(param.annotation)
@@ -275,9 +286,6 @@ class Resolver:
                             f"but expression has the shape {arg_shape}. "
                         ),
                     )
-            # hint is not end of line, so we leave it out until it is fixed
-            # if arg_shape is not None and arg_shape is not ShapeState.UNKNOWN:
-            #     self.diagnostics.hint(func_node, arg_shape)
 
     def subscript_shape(
         self, node: ast.Subscript

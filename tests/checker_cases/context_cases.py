@@ -90,6 +90,14 @@ CONTEXT_CASES = [
     ),
     pytest.param(
         """
+        def func(i=2):
+            return np.zeros((i, 3))
+        res = func()
+        """,
+        id="context_func_default_arg_value",
+    ),
+    pytest.param(
+        """
         def func(y):
             def inner_func(x):
                 return x
