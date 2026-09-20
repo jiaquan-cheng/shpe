@@ -420,7 +420,7 @@ class Handler:
                 node,
                 ErrorCode.MATMUL,
                 (
-                    f"cannot multiply {left_name} {left_shape} and {right_name}. "
+                    f"cannot multiply {left_name} {left_shape} and {right_name} "
                     f"{right_shape}: inner dimensions must match ({n1} != {n2}). "
                 ),
             )
@@ -434,7 +434,7 @@ class Handler:
                 node,
                 ErrorCode.MATMUL,
                 (
-                    f"cannot multiply {left_name} {left_shape} and {right_name}. "
+                    f"cannot multiply {left_name} {left_shape} and {right_name} "
                     f"{right_shape}: batch dimensions {batch_left} and {batch_right} "
                     f"are incompatible. "
                 ),
@@ -474,7 +474,7 @@ class Handler:
                 node,
                 ErrorCode.ELEMENTWISE,
                 (
-                    f"cannot combine {left_name} {left_shape} and {right_name}. "
+                    f"cannot combine {left_name} {left_shape} and {right_name} "
                     f"{right_shape} with element-wise operator. "
                 ),
             )
