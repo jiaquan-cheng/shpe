@@ -2,82 +2,96 @@ from typing import Annotated
 
 import numpy as np
 
-# Basic arrays and implicit shape inference
-a = np.array([[1, 2], [3, 4]])
-b = np.zeros((2, 3))
-c = np.full((3, 3), 7)
-d = a
+# examples of operations where shape inference is supported
+# and where it is not supported
 
-# Operators, transposes, and scalar dimensions
-e = a @ b - b
-f: int = 5
-g = f * e
+# Basic arrays creation
+scalar_value = 5
+float_scalar_value = 5.0
+list = [[1, 2], [3, 4], [5, 6]]
+tuple = ((1, 2), (3, 4), (5, 6))
+nparray = np.array(list)
+zeros = np.zeros((2, 3))
+zeros_from_scalar_value = np.zeros((scalar_value, float_scalar_value))
+full = np.full((3, 2), 5)
+ones = np.ones((3, 2))
+random = np.random.rand(3, 2)
+variable_propogation = nparray
 
-dim: int = 3
-h = np.zeros((dim, 2))
-ht = h.T
+# math
+elementwise_add = nparray + full
+matrix_multiplication = nparray @ zeros
+chained_multiplication = nparray @ zeros @ full
 
-# Slicing and random arrays
-tensor = np.ones((5, 5, 5))
-step_slice = tensor[0:5:2, :, ::2]
-rand_arr = np.random.rand(3, 2)
+# shape manipulation
+transpose = nparray.T
+reshape = nparray.reshape((3, -1))
+step_slice = nparray[0:3:2, :]
+expanded = step_slice.expand_dims(1)
+squeeze = expanded.squeeze()
+swapped = reshape.swapaxes(0, 1)
 
-# Shape manipulations
-flat_arr = a.reshape(4)
-infer_dim_arr = np.reshape(np.full((4, 2, 2), 5), (8, -1))
-
-squeeze_input = np.ones((1, 2, 1, 3))
-squeezed = squeeze_input.squeeze()
-expanded = np.ones((2, 3)).expand_dims(1)
-swapped = np.ones((2, 3, 4)).swapaxes(0, 2)
-
-# Reductions
-tensor_3d = np.ones((2, 3, 4))
-summed_axis = np.sum(tensor_3d, axis=0)
-mean_axis = tensor_3d.mean(axis=1)
-
-# Functions and scope handling
-global_bias = np.ones((2, 3))
+# reductions
+summed_axis = np.sum(swapped, axis=0)
+mean_axis = swapped.mean(axis=1)
 
 
-def compute_transform():
-    local_data = np.zeros((2, 3))
-    return local_data + global_bias
+# functions
+def custom_function(scalar_value=2):
+    zeros_from_scalar_value = np.zeros((scalar_value, float_scalar_value))
+
+    def inner_function():
+        return zeros_from_scalar_value
+
+    return inner_function()
 
 
-def inner_helper(x):
-    return x + np.ones((2, 3))
+function = custom_function()
 
 
-def outer_helper():
-    base = np.zeros((2, 3))
-    return inner_helper(base)
+# recursive function not supported by shape inference
+def recursive_function(n):
+    if n <= 0:
+        return np.array([1])
+    else:
+        return np.array([n]) + recursive_function(n - 1)
 
 
-result = compute_transform()
-chained_result = outer_helper()
+recursive = recursive_function(3)
 
+# not supported control flow
+if True:
+    nparray = np.array([1, 2, 3])
+else:
+    list = [[1, 2], [3, 4], [5, 6]]
 
-# Nested functions are ignored by the analyzer to maintain scope isolation
-def outer_with_nested():
-    def nested_inner(x):
-        return x
+while zeros.shape[0] < 5:
+    zeros = np.zeros((10, 3))
 
-    return nested_inner(np.zeros((2, 3)))
+for _ in range(3):
+    ones = np.ones((3, 2))
 
+# any variables touched will be marked as unknown
+nparray = nparray
+list = list
+zeros = zeros
+ones = ones
 
-nested_out_of_scope_res = outer_with_nested()
+working_inference = np.full((3, 2), 5)
+working_inference = working_inference
 
+# unkown will be propogated
+inference_breaks = ones + working_inference
 
-# Guard to handle recursion safely without triggering infinite loops
-def recursive_function(x):
-    return recursive_function(x)
+# using Annotated, you can reintroduce shapes
+# whenever unsupported operation or control flow is used,
+# so the inference can still work downstream:
+inference_repaired: Annotated[np.ndarray, (3, 2)] = inference_breaks
+inference_repaired = inference_repaired
 
+# combined with # shpy: ignore, you can ignore false errors
+# and replace them with the correct shape
 
-recursive_guard_res = recursive_function(a)
-
-# Error cases requiring explicit shape constraints
-wrong_shape: Annotated[np.ndarray, (2, 3)] = a
-wrong_matmul: Annotated[np.ndarray, (2, 3)] = a @ c
-wrong_elementwise: Annotated[np.ndarray, (2, 3)] = a - b
-wrong_reshape: Annotated[np.ndarray, (2, 3)] = a.reshape((-1, -1))
+# main function will still be inferred:
+if __name__ == "__main__":
+    a = custom_function()

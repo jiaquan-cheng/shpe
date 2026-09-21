@@ -2,6 +2,7 @@
   "name": "shpy-vscode",
   "displayName": "Shpy Shape Analyzer",
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "engines": {
     "vscode": "^1.60.0"
   },

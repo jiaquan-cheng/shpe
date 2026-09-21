@@ -57,13 +57,16 @@ shpy path/to/your/file_or_directory --show-shapes
 Checkout `examples/demo.py` for a more comprehensive demonstration of `shpy`'s capabilities.
 
 ## Limitations
+We prioritize soundness over completeness, so `shpy` might miss errors. When `shpy` is uncertain it, does not infer the shape. 
+
+False positive:
+- We do not track inplace function modification like ` b = a.resize((3, 2))`, so it might infer the wrong shape.
+
+False negatives:
 - Only supports a subset of NumPy arrays and functions.
-- Since shape inference for NumPy function is hard-coded, it may produce incorrect results for some functions.
-- No support for dynamic shape inference (e.g., shapes that depend on runtime values).
-- No control flow support (if, for, while).
-- No support for nested/recursive function definitions.
-- False negatives: To keep development simple,`shpy` identifies functions by suffix, so it may not trigger an error in cases like (`var.expand_dims` without `np.` prefix). 
-- False positives: inplace functions like `a.resize((3, 2))` may trigger an error even though they are valid.
+- No control flow support (if, for, while), variables touched are not inferred.
+- No support for recursive functions.
+- To keep development simple,`shpy` identifies functions by suffix, so it may not trigger an error in cases like (`var.expand_dims` without `np.` prefix). 
 
 If you noticed any bugs or have any feature requests, please report them on [GitHub Issues](https://github.com/jiaquan-cheng/shpy/issues).
 
