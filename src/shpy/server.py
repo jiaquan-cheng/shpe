@@ -1,4 +1,6 @@
 import ast
+import urllib.parse
+from pathlib import Path
 from typing import Any
 
 from lsprotocol.types import (
@@ -26,7 +28,19 @@ from shpy.checker import Checker
 server = LanguageServer("shpy-ls", "v0.1")
 
 
+def _is_dotfile(uri: str) -> bool:
+    """Check if the document filename starts with a dot."""
+    parsed_path = urllib.parse.urlparse(uri).path
+    return Path(urllib.parse.unquote(parsed_path)).name.startswith(".")
+
+
 def validate(ls: LanguageServer, document: TextDocument) -> None:
+
+    if _is_dotfile(document.uri):
+        ls.text_document_publish_diagnostics(
+            PublishDiagnosticsParams(uri=document.uri, diagnostics=[])
+        )
+        return
     code = document.source
     lines = code.splitlines()
 

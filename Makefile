@@ -23,7 +23,8 @@ test:
 
 # vscode extension
 
-vscode-setup: uv sync
+vscode-setup: 
+	uv sync
 	cd shpy-vscode && npm install
 
 vscode-package: vscode-setup
