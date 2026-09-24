@@ -72,7 +72,7 @@ If you noticed any bugs or have any feature requests, please report them on [Git
 
 ## Development
 
-Prerequisites: Python 3.13+, [uv](https://docs.astral.sh/uv/)
+Prerequisites: Python 3.12+, [uv](https://docs.astral.sh/uv/)
 
 To get started locally:
 ```bash
