@@ -6,7 +6,7 @@ const fs = require('fs');
 let client;
 
 function getPythonPath(workspaceRoot) {
-    const userPath = vscode.workspace.getConfiguration('shpy').get('pythonPath');
+    const userPath = vscode.workspace.getConfiguration('shpe').get('pythonPath');
     if (userPath && userPath !== 'python' && userPath !== 'python3') {
         return userPath;
     }
@@ -31,7 +31,7 @@ function activate(context) {
 
     const serverOptions = {
         command: pythonPath, 
-        args: ['-m', 'shpy.server'],
+        args: ['-m', 'shpe.server'],
         options: {
             cwd: workspaceRoot,
             env: Object.assign({}, process.env, {
@@ -44,7 +44,7 @@ function activate(context) {
         documentSelector: [{ scheme: 'file', language: 'python' }],
     };
 
-    client = new LanguageClient('shpy', 'Shpy Language Server', serverOptions, clientOptions);
+    client = new LanguageClient('shpe', 'shpe Language Server', serverOptions, clientOptions);
     client.start();
 }
 

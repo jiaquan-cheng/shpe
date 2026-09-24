@@ -23,9 +23,9 @@ from lsprotocol.types import (
 from pygls.lsp.server import LanguageServer
 from pygls.workspace import TextDocument
 
-from shpy.checker import Checker
+from shpe.checker import Checker
 
-server = LanguageServer("shpy-ls", "v0.1")
+server = LanguageServer("shpe-ls", "v0.1")
 
 
 def _is_dotfile(uri: str) -> bool:
@@ -57,7 +57,7 @@ def validate(ls: LanguageServer, document: TextDocument) -> None:
             ),
             message=str(e.msg),
             severity=DiagnosticSeverity.Error,
-            source="shpy",
+            source="shpe",
         )
         ls.text_document_publish_diagnostics(
             PublishDiagnosticsParams(uri=document.uri, diagnostics=[diag])
@@ -77,7 +77,7 @@ def validate(ls: LanguageServer, document: TextDocument) -> None:
 
             if line_idx < len(lines):
                 line_content = lines[line_idx]
-                if "# shpy: ignore" in line_content:
+                if "# shpe: ignore" in line_content:
                     continue
 
             col = max(0, entry["col"])
@@ -90,7 +90,7 @@ def validate(ls: LanguageServer, document: TextDocument) -> None:
                 ),
                 message=entry["message"],
                 severity=severity,
-                source="shpy",
+                source="shpe",
                 code=entry.get("code"),
             )
             diagnostics.append(diag)

@@ -89,7 +89,7 @@ inference_breaks = ones + working_inference
 inference_repaired: Annotated[np.ndarray, (3, 2)] = inference_breaks
 inference_repaired = inference_repaired
 
-# combined with # shpy: ignore, you can ignore false errors
+# combined with # shpe: ignore, you can ignore false errors
 # and replace them with the correct shape
 
 # main function will still be inferred:

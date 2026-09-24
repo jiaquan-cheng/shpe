@@ -6,7 +6,7 @@ from typing import Annotated
 import numpy as np
 import pytest
 
-from shpy.checker import Checker
+from shpe.checker import Checker
 from tests.checker_cases import (
     ANNOTATION_CASES,
     CONTEXT_CASES,

@@ -1,4 +1,4 @@
-from shpy.cli import main
+from shpe.cli import main
 
 if __name__ == "__main__":
     main()

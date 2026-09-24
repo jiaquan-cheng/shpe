@@ -5,11 +5,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from shpy.checker import Checker
-from shpy.environment import ShapeState
+from shpe.checker import Checker
+from shpe.environment import ShapeState
 
 try:
-    __version__ = importlib.metadata.version("shpy")
+    __version__ = importlib.metadata.version("shpe")
 except importlib.metadata.PackageNotFoundError:
     __version__ = "unknown"
 
@@ -116,7 +116,7 @@ def _process_file(
         line_idx = max(0, line - 1)
         if line_idx < len(lines):
             line_content = lines[line_idx]
-            if "# shpy: ignore" in line_content:
+            if "# shpe: ignore" in line_content:
                 continue
 
         code = warning["code"]
@@ -128,7 +128,7 @@ def _process_file(
         line_idx = max(0, line - 1)
         if line_idx < len(lines):
             line_content = lines[line_idx]
-            if "# shpy: ignore" in line_content:
+            if "# shpe: ignore" in line_content:
                 continue
 
         code = error["code"]

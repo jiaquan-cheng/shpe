@@ -1,6 +1,6 @@
 {
-  "name": "shpy-vscode",
-  "displayName": "Shpy Shape Analyzer",
+  "name": "shpe-vscode",
+  "displayName": "Shpe Shape Analyzer",
   "version": "0.0.1",
   "license": "Apache-2.0",
   "engines": {
@@ -12,12 +12,12 @@
   "main": "./extension.js",
   "contributes": {
     "configuration": {
-      "title": "Shpy",
+      "title": "shpe",
       "properties": {
-        "shpy.pythonPath": {
+        "shpe.pythonPath": {
           "type": "string",
           "default": "",
-          "description": "Path to the Python interpreter used by the Shpy language server. Leave blank for automatic .venv detection."
+          "description": "Path to the Python interpreter used by the Shpe language server. Leave blank for automatic .venv detection."
         }
       }
     }

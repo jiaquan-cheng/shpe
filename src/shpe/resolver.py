@@ -2,10 +2,10 @@ import ast
 from collections.abc import Callable
 from typing import Any, Protocol
 
-from shpy.diagnostics import Diagnostics, ErrorCode
-from shpy.environment import Environment
-from shpy.extractor import Extractor, ShapeState
-from shpy.handlers import Handler
+from shpe.diagnostics import Diagnostics, ErrorCode
+from shpe.environment import Environment
+from shpe.extractor import Extractor, ShapeState
+from shpe.handlers import Handler
 
 
 class StatementWalker(Protocol):

@@ -16,4 +16,4 @@ if __name__ == "__main__":
     d = a @ b
     e = d @ a
     f: Annotated[np.ndarray, (3, 2)] = a.T
-    f: Annotated[np.ndarray, (3, 2)] = a.T  # shpy: ignore
+    f: Annotated[np.ndarray, (3, 2)] = a.T  # shpe: ignore

@@ -3,9 +3,9 @@ import math
 from collections.abc import Callable
 from typing import Any, Protocol
 
-from shpy.diagnostics import Diagnostics, ErrorCode
-from shpy.environment import ShapeState
-from shpy.extractor import Extractor
+from shpe.diagnostics import Diagnostics, ErrorCode
+from shpe.environment import ShapeState
+from shpe.extractor import Extractor
 
 
 class HandlerResolver(Protocol):

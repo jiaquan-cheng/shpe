@@ -1,8 +1,8 @@
 import ast
 import math
 
-from shpy.diagnostics import Diagnostics, ErrorCode
-from shpy.environment import Environment, ShapeState
+from shpe.diagnostics import Diagnostics, ErrorCode
+from shpe.environment import Environment, ShapeState
 
 
 class Extractor:

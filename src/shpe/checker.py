@@ -1,10 +1,10 @@
 import ast
 from typing import Any
 
-from shpy.diagnostics import Diagnostics, ErrorCode
-from shpy.environment import Environment, ShapeState
-from shpy.extractor import Extractor
-from shpy.resolver import Resolver
+from shpe.diagnostics import Diagnostics, ErrorCode
+from shpe.environment import Environment, ShapeState
+from shpe.extractor import Extractor
+from shpe.resolver import Resolver
 
 
 class Checker(ast.NodeVisitor):

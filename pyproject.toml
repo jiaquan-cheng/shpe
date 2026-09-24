@@ -1,5 +1,5 @@
 [project]
-name = "shpy"
+name = "shpe"
 version = "0.2.0"
 description = "A lightweight static shape checker for NumPy tensors."
 readme = "README.md"
@@ -14,7 +14,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/shpy"]
+packages = ["src/shpe"]
 [dependency-groups]
 dev = [
     "mypy>=2.3.0",
@@ -25,7 +25,7 @@ dev = [
 ]
 
 [project.scripts]
-shpy = "shpy.cli:main"
+shpe = "shpe.cli:main"
 
 [tool.ruff]
 target-version = "py313"

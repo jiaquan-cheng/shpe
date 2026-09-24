@@ -10,7 +10,7 @@ setup:
 
 lint:
 	uv run ruff check src tests --fix
-	uv run mypy -p shpy
+	uv run mypy -p shpe
 
 unsafe:
 	uv run ruff check src tests --fix --unsafe-fixes
@@ -25,15 +25,15 @@ test:
 
 vscode-setup: 
 	uv sync
-	cd shpy-vscode && npm install
+	cd shpe-vscode && npm install
 
 vscode-package: vscode-setup
-	cd shpy-vscode && npx @vscode/vsce package --allow-missing-repository
+	cd shpe-vscode && npx @vscode/vsce package --allow-missing-repository
 
 # maintenance
 
 clean:
-	rm -rf shpy-vscode/*.vsix shpy-vscode/node_modules
+	rm -rf shpe-vscode/*.vsix shpe-vscode/node_modules
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type d -name ".mypy_cache" -exec rm -rf {} +
 	find . -type d -name ".ruff_cache" -exec rm -rf {} +
