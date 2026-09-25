@@ -1,26 +1,50 @@
 {
   "name": "shpe-vscode",
-  "displayName": "Shpe Shape Analyzer",
-  "version": "0.0.1",
-  "license": "Apache-2.0",
+  "displayName": "Shpe",
+  "description": "Static analyzer for tensor shapes",
+  "version": "0.2.0",
+  "publisher": "jiaquan-cheng",
   "engines": {
-    "vscode": "^1.60.0"
+    "vscode": "^1.75.0"
   },
-  "activationEvents": [
-    "onLanguage:python"
+  "repository": {
+  "type": "git",
+  "url": "https://github.com/jiaquan-cheng/shpe.git"
+    },
+  "categories": [
+    "Linters",
+    "Programming Languages",
+    "Formatters"
   ],
+  "keywords": [
+    "ast",
+    "tensor",
+    "numpy",
+    "shapes",
+    "static analysis",
+    "python",
+    "linter",
+    "machine learning",
+    "deep learning"
+  ],
+  "license": "Apache-2.0",
+  "activationEvents": [
+  "onLanguage:python"],
   "main": "./extension.js",
   "contributes": {
     "configuration": {
-      "title": "shpe",
+      "title": "Shpe",
       "properties": {
         "shpe.pythonPath": {
           "type": "string",
-          "default": "",
-          "description": "Path to the Python interpreter used by the Shpe language server. Leave blank for automatic .venv detection."
+          "default": "python",
+          "description": "Path to the Python interpreter used by the Shpe language server."
         }
       }
     }
+  },
+  "scripts": {
+    "package": "vsce package"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"

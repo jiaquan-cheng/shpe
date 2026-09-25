@@ -2,49 +2,45 @@
 
 [![CI](https://github.com/jiaquan-cheng/shpe/actions/workflows/ci.yaml/badge.svg)](https://github.com/jiaquan-cheng/shpe/actions/workflows/ci.yaml)
 
-A lightweight static analyzer for tracking and validating NumPy tensor shapes without running the code. 
+A lightweight static analyzer for tracking and validating NumPy tensor shapes without running the code. It is designed to both be a CLI tool that can be used in CI/CD pipelines and a VS Code extension for real-time shape inference and error messages during development.
 
-## VS Code Extension
+> **Important Note for VS Code Extension:** This extension requires the core Python CLI tool to function. Please make sure you run **`pip install shpe`** in your environment!
 
-### Preview
+## VS Code Extension Preview
 
-The VS Code extension provides real-time shape inference and error messages.
+![Shpe VS Code Extension Demo is not loaded.](https://raw.githubusercontent.com/jiaquan-cheng/shpe/main/assets/image.png)
 
-![Shpe VS Code Extension Demo](assets/image.png)
+## CLI Usage
 
-### Installation
-
-It is not yet published on VS Code Marketplace. To install the extension, clone the repository, install the package and build the VS Code extension:
+Alternatively, you can use the CLI tool to check for shape errors in your code.
 
 ```bash
-git clone https://github.com/jiaquan-cheng/shpe.git
-cd shpe
-pip install -e .
-make vscode-package
-```
-This compiles a `.vsix` file in the `shpe-vscode` directory, which you can install as an extension in VS Code.
-
-## Terminal
-
-### Installation
-
-Prerequisites: Python 3.12+
-
-To install `shpe` directly:
-
-```bash
-pip install git+https://github.com/jiaquan-cheng/shpe.git
+shpe examples/intro.py
 ```
 
-### Usage
-
 ```bash
-shpe path/to/your/file_or_directory
+examples/intro.py:15: [Elementwise] cannot combine a (3, 2) and b (2, 2) with element-wise operator. 
+examples/intro.py:17: [MatMul] cannot multiply d (3, 2)and a (3, 2): inner dimensions must match (2 != 3). 
+examples/intro.py:18: [Annotation] f annotated as (3, 2), but expression has the shape (2, 3). 
+
+Found 3 error(s) across 1 file(s).
 ```
 
 You can use the `--show-shapes` flag to display the inferred shapes of all expressions in the code:
 ```bash
 shpe path/to/your/file_or_directory --show-shapes
+```
+
+## Installation
+
+Prerequisites: Python 3.12+
+
+- For VS Code extension, search for `shpe` in the VS Code marketplace and install it.
+
+- For both CLI and VS Code extension, install `shpe`:
+
+```bash
+pip install shpe
 ```
 
 ## Features
@@ -87,4 +83,5 @@ We would recommend to using the VS Code extension or the `--show-shapes` flag to
 - `make lint` : Runs [Ruff](https://docs.astral.sh/ruff/) and [Mypy](https://mypy-lang.org/) for code quality and type safety.
 - `make format` : Auto-format code.
 - `make test` : Runs [Pytest](https://pytest.org/).
+- `make unsafe`: Runs Ruff unsafe fixes.
 - `make clean` : Cleans up the project by removing build artifacts and caches.

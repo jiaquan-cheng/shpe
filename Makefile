@@ -28,7 +28,9 @@ vscode-setup:
 	cd shpe-vscode && npm install
 
 vscode-package: vscode-setup
-	cd shpe-vscode && npx @vscode/vsce package --allow-missing-repository
+	cp README.md shpe-vscode/README.md
+	cp LICENSE shpe-vscode/LICENSE
+	cd shpe-vscode && npx @vscode/vsce package 
 
 # maintenance
 

@@ -222,3 +222,5 @@ __marimo__/
 shpe-vscode/node_modules/
 shpe-vscode/*.vsix
 shpe-vscode/out/
+shpe-vscode/LICENSE
+shpe-vscode/README.md
