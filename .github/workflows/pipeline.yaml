@@ -50,12 +50,14 @@ jobs:
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
 
+
   publish-vscode:
     needs: [quality-check]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
         with:
@@ -65,19 +67,21 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-      - name: Setup and Package VS Code Extension via Makefile
+          node-version: '20'
+
+      - name: Generates .vsix package
+        run: make vscode-package
+
+      - name: Package and Publish VS Code Extension
         run: |
-          make vscode-package
-      - name: Publish VS Code Extension
-        uses: Hirse/vscode-vsce@v1
-        with:
-          args: publish --packagePath shpe-vscode/*.vsix
+          npx @vscode/vsce publish --packagePath shpe-vscode/*.vsix
         env:
           VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
+
 
   create-github-release:
     needs: [quality-check, publish-pypi, publish-vscode]
