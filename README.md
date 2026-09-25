@@ -1,6 +1,6 @@
 # shpe
 
-[![CI](https://github.com/jiaquan-cheng/shpe/actions/workflows/ci.yaml/badge.svg)](https://github.com/jiaquan-cheng/shpe/actions/workflows/ci.yaml)
+[![CI](https://github.com/jiaquan-cheng/shpe/actions/workflows/pipeline.yaml/badge.svg)](https://github.com/jiaquan-cheng/shpe/actions/workflows/pipeline.yaml)
 
 A lightweight static analyzer for tracking and validating NumPy tensor shapes without running the code. It is designed to both be a CLI tool that can be used in CI/CD pipelines and a VS Code extension for real-time shape inference and error messages during development.
 
