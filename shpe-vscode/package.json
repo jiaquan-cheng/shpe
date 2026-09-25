@@ -2,7 +2,7 @@
   "name": "shpe-vscode",
   "displayName": "Shpe",
   "description": "Static analyzer for tensor shapes",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "jiaquan-cheng",
   "engines": {
     "vscode": "^1.75.0"
