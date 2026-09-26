@@ -1,6 +1,6 @@
-.PHONY: all help setup lint lint-fix unsafe format format-check test vscode-setup vscode-package clean
+.PHONY: all help setup lint lint-fix unsafe format format-check test vscode-setup vscode-check vscode-package clean
 
-all: format-check lint test
+all: format-check lint test vscode-check
 
 # core
 
@@ -14,6 +14,7 @@ help:
 	@echo "test             Run pytest"
 	@echo "all              format-check, lint, and test (CI)"
 	@echo "vscode-setup     Install Python and extension npm deps"
+	@echo "vscode-check     Build the VS Code extension package"
 	@echo "vscode-package   Build a .vsix (copies README and LICENSE)"
 	@echo "clean            Remove caches, node_modules, and build artifacts"
 
@@ -44,7 +45,11 @@ test:
 
 vscode-setup:
 	uv sync
-	cd shpe-vscode && npm install
+	cd shpe-vscode && npm ci
+
+vscode-check:
+	cd shpe-vscode && npm ci --ignore-scripts && npm install --no-save --package-lock=false @vscode/vsce && npx vsce package --no-dependencies --out $(CURDIR)/shpe-vscode/shpe-vscode-check.vsix
+	rm -f shpe-vscode/shpe-vscode-check.vsix
 
 vscode-package: vscode-setup
 	cp README.md shpe-vscode/README.md
