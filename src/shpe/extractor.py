@@ -142,10 +142,12 @@ class Extractor:
             return shape
         if isinstance(node, ast.Name):
             return None
+        if isinstance(node, ast.Constant):
+            return ()
         if not isinstance(node, (ast.List, ast.Tuple)):
             return None
         if not node.elts:
-            return None
+            return (0,)
 
         current_dim = len(node.elts)
         sub_shape = self.literal_shape(node.elts[0])
@@ -181,9 +183,11 @@ class Extractor:
 
             start = max(
                 0,
-                current_dim + start_val
-                if start_val < 0
-                else min(start_val, current_dim),
+                (
+                    current_dim + start_val
+                    if start_val < 0
+                    else min(start_val, current_dim)
+                ),
             )
             stop = max(
                 0,

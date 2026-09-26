@@ -47,6 +47,20 @@ CREATION_CASES = [
     ),
     pytest.param(
         """
+        a = np.zeros(shape=(2, 3))
+        b = np.full(shape=(4, 5), fill_value=1)
+        """,
+        id="keyword_shape_creation",
+    ),
+    pytest.param(
+        """
+        a = np.array(5)
+        b = np.array([])
+        """,
+        id="scalar_and_empty_array_creation",
+    ),
+    pytest.param(
+        """
         a: float = 2
         b: int = 3
         c = np.full((a, b), 5)
@@ -78,6 +92,12 @@ CREATION_CASES = [
         c = np.random.random((2, 2, 2))
         """,
         id="random_generation_random",
+    ),
+    pytest.param(
+        """
+        a = np.random.random(size=(2, 3))
+        """,
+        id="random_generation_keyword_size",
     ),
     pytest.param(
         """
@@ -146,5 +166,13 @@ CREATION_CASES = [
         grid = np.meshgrid(x, y)
         """,
         id="sequence_meshgrid",
+    ),
+    pytest.param(
+        """
+        x = np.array([1, 2, 3])
+        y = np.array([4, 5])
+        first = np.meshgrid(x, y)[0]
+        """,
+        id="sequence_meshgrid_indexed_result",
     ),
 ]

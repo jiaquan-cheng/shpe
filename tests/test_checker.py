@@ -1,22 +1,16 @@
 import ast
 import traceback
 from textwrap import dedent
-from typing import Annotated
 
 import numpy as np
 import pytest
 
 from shpe.checker import Checker
 from tests.checker_cases import (
-    ANNOTATION_CASES,
     CONTEXT_CASES,
     CREATION_CASES,
     MATH_CASES,
     SHAPE_CASES,
-)
-
-TEST_CASES = (
-    CREATION_CASES + CONTEXT_CASES + ANNOTATION_CASES + MATH_CASES + SHAPE_CASES
 )
 
 
@@ -29,7 +23,7 @@ def checker_runtime_oracle(code: str) -> None:
     checker = Checker()
     checker.visit(tree)
 
-    runtime_namespace = {"np": np, "Annotated": Annotated}
+    runtime_namespace = {"np": np}
     try:
         exec(cleaned_code, runtime_namespace)
     except Exception as e:
@@ -64,14 +58,6 @@ def checker_runtime_oracle(code: str) -> None:
                     f"  Actual:    {runtime_val.shape}\n"
                     f"  Table:     {checker.shapes}"
                 )
-
-
-# @pytest.mark.parametrize(
-#     "code",
-#     ANNOTATION_CASES,
-# )
-# def test_checker_annotation(code: str) -> None:
-#     checker_runtime_oracle(code)
 
 
 @pytest.mark.parametrize(

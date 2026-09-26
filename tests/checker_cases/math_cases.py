@@ -170,4 +170,11 @@ MATH_CASES = [
         """,
         id="reduction_np_mean_axis_neg3",
     ),
+    pytest.param(
+        """
+        a = np.ones((2, 3, 4))
+        b = np.sum(a, axis=3)
+        """,
+        id="reduction_np_sum_invalid_axis",
+    ),
 ]

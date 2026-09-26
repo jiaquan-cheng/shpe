@@ -298,6 +298,15 @@ class Resolver:
         Returns:
             The sliced shape tuple, or None.
         """
+        if (
+            isinstance(node.value, ast.Call)
+            and isinstance(node.value.func, ast.Attribute)
+            and node.value.func.attr == "meshgrid"
+            and isinstance(node.slice, ast.Constant)
+            and isinstance(node.slice.value, int)
+        ):
+            return self.shape(node.value)
+
         shape = self.shape(node.value)
         if shape is ShapeState.UNKNOWN:
             return ShapeState.UNKNOWN
@@ -319,6 +328,10 @@ class Resolver:
                         shape_idx += 1
                 continue
 
+            if isinstance(s, ast.Constant) and s.value is None:
+                result_shape.append(1)
+                continue
+
             if shape_idx >= len(shape):
                 break
 
@@ -330,7 +343,15 @@ class Resolver:
                 shape_idx += 1
             elif isinstance(s, ast.Constant) and isinstance(s.value, int):
                 shape_idx += 1
+            elif isinstance(s, (ast.List, ast.Tuple)):
+                index_shape = self.extractor.literal_shape(s)
+                if isinstance(index_shape, tuple):
+                    result_shape.extend(index_shape)
+                shape_idx += 1
             else:
+                advanced_shape = self.shape(s)
+                if isinstance(advanced_shape, tuple):
+                    result_shape.extend(advanced_shape)
                 shape_idx += 1
 
         while shape_idx < len(shape):

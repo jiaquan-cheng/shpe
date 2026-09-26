@@ -66,9 +66,7 @@ class Handler:
                 ["array"],
             ),
             (
-                lambda node: (
-                    self.extractor.expr_shape(node.args[0]) if node.args else None
-                ),
+                lambda node: self._shape_argument(node, "shape", 0),
                 ["zeros", "ones", "empty", "full"],
             ),
             (self._infer_reshape, ["reshape"]),
@@ -492,6 +490,13 @@ class Handler:
         Returns:
             The inferred shape tuple, or None.
         """
+        size_node = next(
+            (kw.value for kw in node.keywords if kw.arg == "size"),
+            None,
+        )
+        if size_node is not None:
+            return self.extractor.expr_shape(size_node)
+
         if len(node.args) == 1:
             extracted = self.extractor.expr_shape(node.args[0])
             if extracted is ShapeState.UNKNOWN:
@@ -509,6 +514,15 @@ class Handler:
             else:
                 return None
         return tuple(shape) if shape else None
+
+    def _shape_argument(
+        self, node: ast.Call, keyword: str, position: int
+    ) -> tuple[int | str, ...] | ShapeState | None:
+        argument = next(
+            (kw.value for kw in node.keywords if kw.arg == keyword),
+            node.args[position] if len(node.args) > position else None,
+        )
+        return self.extractor.expr_shape(argument) if argument is not None else None
 
     def _infer_randint_shape(
         self, node: ast.Call
@@ -595,9 +609,19 @@ class Handler:
         axes: list[int] = []
         for axis in axis_shape:
             if not isinstance(axis, int) or not -len(shape) <= axis < len(shape):
+                self.diagnostics.error(
+                    node,
+                    ErrorCode.VALUE,
+                    f"Reduction axis {axis} is out of bounds for shape {shape}. ",
+                )
                 return shape
             normalized_axis = axis + len(shape) if axis < 0 else axis
             if normalized_axis in axes:
+                self.diagnostics.error(
+                    node,
+                    ErrorCode.VALUE,
+                    f"Reduction axis {axis} is specified more than once. ",
+                )
                 return shape
             axes.append(normalized_axis)
 

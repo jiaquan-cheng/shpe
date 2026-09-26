@@ -52,6 +52,20 @@ CONTEXT_CASES = [
     ),
     pytest.param(
         """
+        a = np.ones((2, 3))
+        expanded = a[:, None]
+        """,
+        id="context_slicing_newaxis",
+    ),
+    pytest.param(
+        """
+        a = np.ones((2, 3))
+        selected = a[[0, 1]]
+        """,
+        id="context_slicing_integer_array",
+    ),
+    pytest.param(
+        """
         global_var = np.zeros((2, 2))
         b = np.ones((3, 3))
         def unannotated_func():
