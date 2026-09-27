@@ -45,19 +45,19 @@ test:
 
 vscode-setup:
 	uv sync
-	cd shpe-vscode && npm ci
+	cd editors/vscode && npm ci
 
 vscode-check:
-	cd shpe-vscode && npm ci --ignore-scripts && npm install --no-save --package-lock=false @vscode/vsce && npx vsce package --no-dependencies --out $(CURDIR)/shpe-vscode/shpe-vscode-check.vsix
-	rm -f shpe-vscode/shpe-vscode-check.vsix
+	cd editors/vscode && npm ci --ignore-scripts && npm install --no-save --package-lock=false @vscode/vsce && npx vsce package --no-dependencies --out $(CURDIR)/editors/vscode/editors/vscode-check.vsix
+	rm -f editors/vscode/editors/vscode-check.vsix
 
 vscode-package: vscode-setup
-	cp README.md shpe-vscode/README.md
-	cp LICENSE shpe-vscode/LICENSE
-	cd shpe-vscode && npx @vscode/vsce package
+	cp README.md editors/vscode/README.md
+	cp LICENSE editors/vscode/LICENSE
+	cd editors/vscode && npx @vscode/vsce package
 
 # maintenance
 
 clean:
-	rm -rf dist shpe-vscode/*.vsix shpe-vscode/node_modules
+	rm -rf dist editors/vscode/*.vsix editors/vscode/node_modules
 	find . -type d \( -name "__pycache__" -o -name ".mypy_cache" -o -name ".ruff_cache" -o -name ".pytest_cache" -o -name "*.egg-info" \) -prune -exec rm -rf {} +

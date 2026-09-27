@@ -83,7 +83,7 @@ jobs:
 
       - name: Package and Publish VS Code Extension
         run: |
-          npx @vscode/vsce publish --packagePath shpe-vscode/*.vsix
+          npx @vscode/vsce publish --packagePath editors/vscode/*.vsix
         env:
           VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
 
