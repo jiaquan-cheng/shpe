@@ -224,3 +224,5 @@ editors/vscode/*.vsix
 editors/vscode/out/
 editors/vscode/LICENSE
 editors/vscode/README.md
+editors/pycharm/LICENSE
+editors/pycharm/README.md

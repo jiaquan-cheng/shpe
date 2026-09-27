@@ -23,6 +23,12 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -87,9 +93,36 @@ jobs:
         env:
           VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
 
+  publish-pycharm:
+    needs: [quality-check]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Build PyCharm plugin
+        run: make pycharm-package
+
+      - name: Publish PyCharm plugin to Marketplace
+        run: ./gradlew publishPlugin
+        env:
+          JETBRAINS_TOKEN: ${{ secrets.JETBRAINS_TOKEN }}
+
+      - name: Upload PyCharm plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pycharm-plugin
+          path: editors/pycharm/build/distributions/*.zip
+
 
   create-github-release:
-    needs: [quality-check, publish-pypi, publish-vscode]
+    needs: [quality-check, publish-pypi, publish-vscode, publish-pycharm]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -97,7 +130,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download PyCharm plugin artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pycharm-plugin
+          path: release-assets
+
       - name: Create GitHub Release & Auto-Generate Notes
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          files: release-assets/*.zip

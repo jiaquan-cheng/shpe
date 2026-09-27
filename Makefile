@@ -1,6 +1,6 @@
-.PHONY: all help setup lint lint-fix unsafe format format-check test vscode-setup vscode-check vscode-package clean
+.PHONY: all help setup lint lint-fix unsafe format format-check test vscode-setup vscode-check vscode-package pycharm-check pycharm-package clean
 
-all: format-check lint test vscode-check
+all: format-check lint test vscode-check pycharm-check
 
 # core
 
@@ -12,10 +12,12 @@ help:
 	@echo "lint-fix         Apply ruff auto-fixes"
 	@echo "unsafe           Apply ruff unsafe auto-fixes"
 	@echo "test             Run pytest"
-	@echo "all              format-check, lint, and test (CI)"
+	@echo "all              format-check, lint, tests, and editor package checks (CI)"
 	@echo "vscode-setup     Install Python and extension npm deps"
 	@echo "vscode-check     Build the VS Code extension package"
 	@echo "vscode-package   Build a .vsix (copies README and LICENSE)"
+	@echo "pycharm-check    Build the PyCharm plugin ZIP"
+	@echo "pycharm-package  Build the PyCharm plugin ZIP"
 	@echo "clean            Remove caches, node_modules, and build artifacts"
 
 setup:
@@ -56,8 +58,23 @@ vscode-package: vscode-setup
 	cp LICENSE editors/vscode/LICENSE
 	cd editors/vscode && npx @vscode/vsce package
 
+# pycharm extension
+
+pycharm-check:
+	cp README.md editors/pycharm/README.md
+	cp LICENSE editors/pycharm/LICENSE
+	cd editors/pycharm && ./gradlew clean buildPlugin
+	rm -rf editors/pycharm/build
+	rm -f editors/pycharm/README.md editors/pycharm/LICENSE
+
+pycharm-package:
+	cp README.md editors/pycharm/README.md
+	cp LICENSE editors/pycharm/LICENSE
+	cd editors/pycharm && ./gradlew buildPlugin
+
 # maintenance
 
 clean:
-	rm -rf dist editors/vscode/*.vsix editors/vscode/node_modules
+	rm -rf dist editors/vscode/*.vsix editors/vscode/node_modules editors/pycharm/build
+	rm -f editors/vscode/LICENSE editors/vscode/README.md editors/pycharm/LICENSE editors/pycharm/README.md
 	find . -type d \( -name "__pycache__" -o -name ".mypy_cache" -o -name ".ruff_cache" -o -name ".pytest_cache" -o -name "*.egg-info" \) -prune -exec rm -rf {} +

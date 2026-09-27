@@ -2,9 +2,15 @@
 
 ![CI](https://img.shields.io/github/actions/workflow/status/jiaquan-cheng/shpe/pipeline.yaml) ![PyPI](https://img.shields.io/pypi/v/shpe) ![PyPI - License](https://img.shields.io/pypi/l/shpe)
 
-> **Important Note for VS Code Extension:** This extension requires the core Python CLI tool to function. Please make sure you run `pip install shpe` in your environment!
+<!-- Plugin description -->
 
-A lightweight static analyzer for tracking and validating NumPy tensor shapes. It automatically infers and shows shapes, so you do not need manual shape comments anymore. It catches shape errors directly in VS Code before you even run your code, and you can also integrate it into your CI/CD pipeline.
+> **Important Note for Editor:** This extension/plugin requires the core Python CLI tool to function. Please make sure you run `pip install shpe` in your environment!
+
+
+A lightweight static analyzer for tracking and validating NumPy tensor shapes. It automatically infers and shows shapes, so you do not need manual shape comments anymore. It catches shape errors directly in your editor before you even run your code, and you can also integrate it into your CI/CD pipeline.
+
+![VS Code Demo not loaded.](assets/vscode_intro.png)
+![PyCharm Demo not loaded.](assets/pycharm_intro.png)
 
 ## Install
 
@@ -20,7 +26,7 @@ or with [uv](https://docs.astral.sh/uv/):
 uv add shpe
 ```
 
-Search for `shpe` in the [VS Code Marketplace.](https://marketplace.visualstudio.com/items?itemName=jiaquan-cheng.shpe-vscode). 
+Search for `shpe` in the [VS Code Marketplace.](https://marketplace.visualstudio.com/items?itemName=jiaquan-cheng.shpe-vscode) or PyCharm Marketplace.
 
 ## CLI
 
@@ -62,3 +68,5 @@ Bugs and requests: [GitHub Issues](https://github.com/jiaquan-cheng/shpe/issues)
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/architecture.md](docs/architecture.md).
+
+<!-- Plugin description end -->
