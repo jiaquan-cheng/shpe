@@ -7,12 +7,11 @@ import numpy as np
 
 # Basic arrays creation
 scalar_value = 5
-float_scalar_value = 5.0
 list = [[1, 2], [3, 4], [5, 6]]
 tuple = ((1, 2), (3, 4), (5, 6))
 nparray = np.array(list)
 zeros = np.zeros((2, 3))
-zeros_from_scalar_value = np.zeros((scalar_value, float_scalar_value))
+zeros_from_scalar_value = np.zeros((scalar_value, scalar_value))
 full = np.full((3, 2), 5)
 ones = np.ones((3, 2))
 random = np.random.rand(3, 2)
@@ -27,7 +26,7 @@ chained_multiplication = nparray @ zeros @ full
 transpose = nparray.T
 reshape = nparray.reshape((3, -1))
 step_slice = nparray[0:3:2, :]
-expanded = step_slice.expand_dims(1)
+expanded = np.expand_dims(step_slice, 1)
 squeeze = expanded.squeeze()
 swapped = reshape.swapaxes(0, 1)
 
@@ -38,7 +37,7 @@ mean_axis = swapped.mean(axis=1)
 
 # functions
 def custom_function(scalar_value=2):
-    zeros_from_scalar_value = np.zeros((scalar_value, float_scalar_value))
+    zeros_from_scalar_value = np.zeros((scalar_value, scalar_value))
 
     def inner_function():
         return zeros_from_scalar_value

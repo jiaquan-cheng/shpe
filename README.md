@@ -1,6 +1,6 @@
 # shpe
 
-![CI](https://img.shields.io/github/actions/workflow/status/jiaquan-cheng/shpe/pipeline.yaml)
+![CI](https://img.shields.io/github/actions/workflow/status/jiaquan-cheng/shpe/pipeline.yaml) ![PyPI](https://img.shields.io/pypi/v/shpe) ![PyPI - License](https://img.shields.io/pypi/l/shpe)
 
 > **Important Note for VS Code Extension:** This extension requires the core Python CLI tool to function. Please make sure you run `pip install shpe` in your environment!
 
