@@ -1,6 +1,6 @@
-.PHONY: all help setup lint lint-fix unsafe format format-check test vscode-setup vscode-check vscode-package pycharm-check pycharm-package clean
+.PHONY: all help setup lint lint-fix unsafe format format-check test pypi-check vscode-setup vscode-check vscode-package pycharm-check pycharm-package clean
 
-all: format-check lint test vscode-check pycharm-check
+all: format-check lint test pypi-check vscode-check pycharm-check
 
 # core
 
@@ -12,7 +12,8 @@ help:
 	@echo "lint-fix         Apply ruff auto-fixes"
 	@echo "unsafe           Apply ruff unsafe auto-fixes"
 	@echo "test             Run pytest"
-	@echo "all              format-check, lint, tests, and editor package checks (CI)"
+	@echo "pypi-check       Build and check PyPI distributions without publishing"
+	@echo "all              format-check, lint, tests, and package checks (CI)"
 	@echo "vscode-setup     Install Python and extension npm deps"
 	@echo "vscode-check     Build the VS Code extension package"
 	@echo "vscode-package   Build a .vsix (copies README and LICENSE)"
@@ -43,6 +44,11 @@ format-check:
 test:
 	uv run pytest
 
+pypi-check:
+	uv build
+	test -n "$$(find dist -maxdepth 1 -type f \( -name '*.whl' -o -name '*.tar.gz' \) -print -quit)"
+	rm -rf dist
+
 # vscode extension
 
 vscode-setup:
@@ -50,8 +56,12 @@ vscode-setup:
 	cd editors/vscode && npm ci
 
 vscode-check:
-	cd editors/vscode && npm ci --ignore-scripts && npm install --no-save --package-lock=false @vscode/vsce && npx vsce package --no-dependencies --out $(CURDIR)/editors/vscode/editors/vscode-check.vsix
-	rm -f editors/vscode/editors/vscode-check.vsix
+	cp README.md editors/vscode/README.md
+	cp LICENSE editors/vscode/LICENSE
+	cd editors/vscode && npm ci --ignore-scripts && npm install --no-save --package-lock=false @vscode/vsce && npx vsce package --no-dependencies --out $(CURDIR)/editors/vscode/vscode-check.vsix
+	test -f editors/vscode/vscode-check.vsix
+	rm -f editors/vscode/vscode-check.vsix
+	rm -f editors/vscode/README.md editors/vscode/LICENSE
 
 vscode-package: vscode-setup
 	cp README.md editors/vscode/README.md
@@ -64,6 +74,7 @@ pycharm-check:
 	cp README.md editors/pycharm/README.md
 	cp LICENSE editors/pycharm/LICENSE
 	cd editors/pycharm && ./gradlew clean buildPlugin
+	test -n "$$(find editors/pycharm/build/distributions -maxdepth 1 -type f -name '*.zip' -print -quit)"
 	rm -rf editors/pycharm/build
 	rm -f editors/pycharm/README.md editors/pycharm/LICENSE
 
