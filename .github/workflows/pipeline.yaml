@@ -40,8 +40,45 @@ jobs:
       - name: Run Linting and Tests via Makefile
         run: make all
 
-  publish-pypi:
+  pycharm-build:
     needs: [quality-check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build PyCharm plugin
+        run: make pycharm-check
+
+  pycharm-verification:
+    needs: [pycharm-build]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Verify PyCharm plugin compatibility
+        run: make pycharm-verify
+
+  publish-pypi:
+    needs: [pycharm-verification]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -63,8 +100,8 @@ jobs:
 
 
   publish-vscode:
-    needs: [quality-check]
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    needs: [pycharm-verification]
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -94,7 +131,7 @@ jobs:
           VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
 
   publish-pycharm:
-    needs: [quality-check]
+    needs: [pycharm-verification]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
@@ -122,7 +159,7 @@ jobs:
 
 
   create-github-release:
-    needs: [quality-check, publish-pypi, publish-vscode, publish-pycharm]
+    needs: [publish-pypi, publish-vscode, publish-pycharm]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:

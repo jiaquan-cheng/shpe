@@ -1,6 +1,6 @@
-.PHONY: all help setup lint lint-fix unsafe format format-check test pypi-check vscode-setup vscode-check vscode-package pycharm-check pycharm-package clean
+.PHONY: all help setup lint lint-fix unsafe format format-check test pypi-check vscode-setup vscode-check vscode-package pycharm-check pycharm-verify pycharm-package clean
 
-all: format-check lint test pypi-check vscode-check pycharm-check
+all: format-check lint test pypi-check vscode-check
 
 # core
 
@@ -18,6 +18,7 @@ help:
 	@echo "vscode-check     Build the VS Code extension package"
 	@echo "vscode-package   Build a .vsix (copies README and LICENSE)"
 	@echo "pycharm-check    Build the PyCharm plugin ZIP"
+	@echo "pycharm-verify   Verify PyCharm plugin compatibility (downloads IDEs)"
 	@echo "pycharm-package  Build the PyCharm plugin ZIP"
 	@echo "clean            Remove caches, node_modules, and build artifacts"
 
@@ -75,7 +76,13 @@ pycharm-check:
 	cp LICENSE editors/pycharm/LICENSE
 	cd editors/pycharm && ./gradlew clean buildPlugin
 	test -n "$$(find editors/pycharm/build/distributions -maxdepth 1 -type f -name '*.zip' -print -quit)"
-	cd editors/pycharm && ./gradlew verifyPlugin
+	rm -rf editors/pycharm/build
+	rm -f editors/pycharm/README.md editors/pycharm/LICENSE
+
+pycharm-verify:
+	cp README.md editors/pycharm/README.md
+	cp LICENSE editors/pycharm/LICENSE
+	cd editors/pycharm && ./gradlew clean verifyPlugin
 	rm -rf editors/pycharm/build
 	rm -f editors/pycharm/README.md editors/pycharm/LICENSE
 
@@ -87,6 +94,6 @@ pycharm-package:
 # maintenance
 
 clean:
-	rm -rf dist editors/vscode/*.vsix editors/vscode/node_modules editors/pycharm/build
+	rm -rf dist editors/vscode/*.vsix editors/vscode/node_modules editors/pycharm/build editors/pycharm/.gradle editors/pycharm/.intellijPlatform
 	rm -f editors/vscode/LICENSE editors/vscode/README.md editors/pycharm/LICENSE editors/pycharm/README.md
 	find . -type d \( -name "__pycache__" -o -name ".mypy_cache" -o -name ".ruff_cache" -o -name ".pytest_cache" -o -name "*.egg-info" \) -prune -exec rm -rf {} +

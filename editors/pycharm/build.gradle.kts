@@ -1,5 +1,7 @@
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask
+import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask
 import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.gradle.api.tasks.compile.JavaCompile
@@ -40,6 +42,12 @@ dependencies {
 }
 
 intellijPlatform {
+    pluginVerification {
+        ides {
+            create(IntelliJPlatformType.PyCharm, "2026.1.4")
+        }
+    }
+
     pluginConfiguration {
         description = providers.fileContents(layout.projectDirectory.file("README.md")).asText.map { readme ->
             val start = "<!-- Plugin description -->"
@@ -57,6 +65,10 @@ intellijPlatform {
             untilBuild = provider { null }
         }
     }
+}
+
+tasks.named<VerifyPluginTask>("verifyPlugin") {
+    dependsOn(tasks.named("buildPlugin"))
 }
 
 tasks.named<PrepareSandboxTask>("prepareSandbox") {
