@@ -3,25 +3,25 @@ package dev.shpe.pycharm
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.platform.lsp.api.LspServerSupportProvider
-import com.intellij.platform.lsp.api.ProjectWideLspServerDescriptor
+import com.intellij.platform.lsp.api.LspIntegrationProvider
+import com.intellij.platform.lsp.api.ProjectWideLspClientDescriptor
 import java.nio.file.Files
 import java.nio.file.Path
 
-internal class ShpeLspServerSupportProvider : LspServerSupportProvider {
+internal class ShpeLspIntegrationProvider : LspIntegrationProvider {
     override fun fileOpened(
         project: Project,
         file: VirtualFile,
-        serverStarter: LspServerSupportProvider.LspServerStarter,
+        clientStarter: LspIntegrationProvider.LspClientStarter,
     ) {
         if (file.extension.equals("py", ignoreCase = true)) {
-            serverStarter.ensureServerStarted(ShpeLspServerDescriptor(project))
+            clientStarter.ensureClientStarted(ShpeLspClientDescriptor(project))
         }
     }
 }
 
-private class ShpeLspServerDescriptor(project: Project) :
-    ProjectWideLspServerDescriptor(project, "Shpe") {
+private class ShpeLspClientDescriptor(project: Project) :
+    ProjectWideLspClientDescriptor(project, "Shpe") {
     private val projectBasePath = project.basePath
 
     override fun isSupportedFile(file: VirtualFile): Boolean =

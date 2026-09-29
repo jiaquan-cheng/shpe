@@ -75,6 +75,7 @@ pycharm-check:
 	cp LICENSE editors/pycharm/LICENSE
 	cd editors/pycharm && ./gradlew clean buildPlugin
 	test -n "$$(find editors/pycharm/build/distributions -maxdepth 1 -type f -name '*.zip' -print -quit)"
+	cd editors/pycharm && ./gradlew verifyPlugin
 	rm -rf editors/pycharm/build
 	rm -f editors/pycharm/README.md editors/pycharm/LICENSE
 

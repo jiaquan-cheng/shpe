@@ -52,8 +52,8 @@ intellijPlatform {
             markdownToHTML(readme.substring(startIndex + start.length, endIndex).trim())
         }
         ideaVersion {
-            // Unified PyCharm includes LSP in Community mode starting with 2025.1 (build 251).
-            sinceBuild = "251"
+            // The non-deprecated LSP client API and integration provider require 2026.1.4+.
+            sinceBuild = "261.1"
             untilBuild = provider { null }
         }
     }

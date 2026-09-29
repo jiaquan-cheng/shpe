@@ -9,10 +9,10 @@
 
 A lightweight static analyzer for tracking and validating NumPy tensor shapes. It automatically infers and shows shapes, so you do not need manual shape comments anymore. It catches shape errors directly in your editor before you even run your code, and you can also integrate it into your CI/CD pipeline.
 ## VS Code Demo
-![VS Code Image not loaded.](assets/vscode_intro.png)
+![VS Code Image not loaded.](https://raw.githubusercontent.com/jiaquan-cheng/shpe/main/assets/vscode_intro.png)
 
 ## PyCharm Demo
-![PyCharm Image not loaded.](assets/pycharm_intro.png)
+![PyCharm Image not loaded.](https://raw.githubusercontent.com/jiaquan-cheng/shpe/main/assets/pycharm_intro.png)
 
 ## Install
 

@@ -3,13 +3,13 @@
     <name>Shpe</name>
     <url>https://github.com/jiaquan-cheng/shpe</url>
     <vendor url="https://github.com/jiaquan-cheng/shpe">Shpe</vendor>
-    <idea-version since-build="251" />
+    <idea-version since-build="261.1" />
 
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.lsp</depends>
     <depends>com.intellij.modules.python</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <platform.lsp.serverSupportProvider implementation="dev.shpe.pycharm.ShpeLspServerSupportProvider" />
+        <platform.lsp.integrationProvider implementation="dev.shpe.pycharm.ShpeLspIntegrationProvider" />
     </extensions>
 </idea-plugin>

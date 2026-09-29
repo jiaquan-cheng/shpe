@@ -112,7 +112,7 @@ jobs:
       - name: Publish PyCharm plugin to Marketplace
         run: ./gradlew publishPlugin
         env:
-          JETBRAINS_TOKEN: ${{ secrets.JETBRAINS_TOKEN }}
+          PUBLISH_TOKEN: ${{ secrets.JETBRAINS_TOKEN }}
 
       - name: Upload PyCharm plugin artifact
         uses: actions/upload-artifact@v4
