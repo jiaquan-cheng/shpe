@@ -3,6 +3,7 @@ import pytest
 MATH_CASES = [
     pytest.param(
         """
+        import numpy as np
         a = np.array([[1, 2], [3, 4]])
         b = np.array([[5, 6], [7, 8]])
         c = np.array([[9, 10], [11, 12]])
@@ -12,6 +13,7 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.array([[1, 2], [3, 4]])
         b = np.array([[5, 6], [7, 8]])
         c = np.array([[9, 10], [11, 12]])
@@ -21,6 +23,7 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.array([[1, 2], [3, 4]])
         f: float = 2
         g = f * a
@@ -29,12 +32,14 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         h = np.ones((2, 1)) + np.ones((1, 3))
         """,
         id="binary_operation_broadcasting",
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.array([[1, 2], [3, 4]])
         b = np.array([[5, 6, 7], [8, 9, 10]])
         c = a + b
@@ -43,6 +48,7 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.array([[1, 2], [3, 4]])
         b = np.array([[5, 6, 7], [8, 9, 10]])
         d = a - b
@@ -51,6 +57,7 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.array([[1, 2], [3, 4]])
         b = np.array([[5, 6, 7], [8, 9, 10]])
         e = a * b
@@ -59,6 +66,7 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.array([[1, 2], [3, 4]])
         b = np.array([[5, 6, 7], [8, 9, 10]])
         f = a / b
@@ -67,6 +75,7 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.array([[1, 2], [3, 4]])
         b = np.array([[5, 6, 7], [8, 9, 10]])
         c = a @ b
@@ -75,6 +84,7 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.array([[1, 2], [3, 4]])
         b = np.array([[5, 6, 7], [8, 9, 10], [11, 12, 13]])
         c = a @ b
@@ -83,6 +93,7 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.array([[1, 2], [3, 4]])
         b = np.array([[5, 6, 7], [8, 9, 10]])
         c = np.array([[11, 12, 13], [14, 15, 16], [17, 18, 19]])
@@ -92,6 +103,7 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.array([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
         b = np.array([[[9, 10, 11], [12, 13, 14]], [[15, 16, 17], [18, 19, 20]]])
         c = a @ b
@@ -100,6 +112,7 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a: float = 2
         c = np.array([[1, 2, 3], [4, 5, 6]])
         d = a * c
@@ -108,6 +121,7 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         b: int = 3
         c = np.array([[1, 2, 3], [4, 5, 6]])
         e = b * c
@@ -116,6 +130,8 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
+        import numpy as np
         a = np.ones((2, 3, 4))
         b = np.sum(a, axis=0)
         """,
@@ -123,6 +139,7 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3, 4))
         c = np.mean(a, axis=1)
         """,
@@ -130,6 +147,7 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3, 4))
         d = np.prod(a, axis=-1)
         """,
@@ -137,6 +155,7 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3, 4))
         e = a.sum(axis=0)
         """,
@@ -144,6 +163,7 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3, 4))
         f = a.mean(axis=1)
         """,
@@ -151,6 +171,7 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3, 4))
         g = np.sum(a)
         """,
@@ -158,6 +179,7 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3, 4))
         h = np.sum(a, axis=(1, 2))
         """,
@@ -165,6 +187,7 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3, 4))
         i = np.mean(a, axis=-3)
         """,
@@ -172,6 +195,7 @@ MATH_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3, 4))
         b = np.sum(a, axis=3)
         """,

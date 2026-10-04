@@ -3,6 +3,7 @@ import pytest
 SHAPE_CASES = [
     pytest.param(
         """
+        import numpy as np
         a = np.full((2, 3), 5)
         at = a.T
         """,
@@ -10,12 +11,14 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         b = np.full((2, 3), 5).T
         """,
         id="transpose_inline",
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3))
         b = a.reshape(6)
         """,
@@ -23,6 +26,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3))
         c = a.reshape((3, 2))
         """,
@@ -30,12 +34,14 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         d = np.full((4, 2, 2), 5).reshape((2, 8))
         """,
         id="reshape_inline_method",
     ),
     pytest.param(
         """
+        import numpy as np
         d = np.full((4, 2, 2), 5)
         f = np.reshape(d, (8, -1))
         """,
@@ -43,6 +49,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         d = np.full((4, 2, 2), 5)
         g = np.reshape(d, (2, 2, -1, 2))
         """,
@@ -50,6 +57,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3))
         h = np.reshape(a, (-1, 2))
         """,
@@ -57,6 +65,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3))
         b = a.reshape(7)
         """,
@@ -64,6 +73,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3))
         c = a.reshape((4, 2))
         """,
@@ -71,6 +81,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3))
         d = np.reshape(a, (-1, -1))
         """,
@@ -78,6 +89,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3))
         b = a.flatten()
         """,
@@ -85,6 +97,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3))
         b = a.ravel()
         """,
@@ -92,6 +105,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3))
         c = np.ravel(a)
         """,
@@ -99,6 +113,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((1, 2, 1, 3))
         b = a.squeeze()
         """,
@@ -106,6 +121,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((1, 2, 1, 3))
         c = np.squeeze(a)
         """,
@@ -113,6 +129,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((1, 2, 1, 3))
         d = a.squeeze(axis=0)
         """,
@@ -120,6 +137,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((1, 2, 1, 3))
         e = a.squeeze(axis=2)
         """,
@@ -127,6 +145,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((1, 2, 1, 3))
         f = a.squeeze(axis=(0, 2))
         """,
@@ -134,6 +153,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((1, 2, 1, 3))
         g = a.squeeze(axis=-2)
         """,
@@ -141,6 +161,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3))
         c = np.expand_dims(a, 2)
         """,
@@ -148,6 +169,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3))
         f = np.expand_dims(a, axis=2)
         """,
@@ -155,6 +177,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3, 4))
         b = a.swapaxes(0, 2)
         """,
@@ -162,6 +185,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3, 4))
         c = np.swapaxes(a, 1, 2)
         """,
@@ -169,6 +193,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3, 4))
         e = np.swapaxes(a, -3, -1)
         """,
@@ -176,6 +201,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3))
         b = a.resize((4, 1))
         """,
@@ -184,6 +210,7 @@ SHAPE_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3))
         c = np.resize(a, (3, 2))
         """,

@@ -4,6 +4,7 @@ from textwrap import dedent
 
 import numpy as np
 import pytest
+import torch
 
 from shpe.checker import Checker
 from tests.checker_cases import (
@@ -23,7 +24,7 @@ def checker_runtime_oracle(code: str) -> None:
     checker = Checker()
     checker.visit(tree)
 
-    runtime_namespace = {"np": np}
+    runtime_namespace = {"np": np, "torch": torch}
     try:
         exec(cleaned_code, runtime_namespace)
     except Exception as e:

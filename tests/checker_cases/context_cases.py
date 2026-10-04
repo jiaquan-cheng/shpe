@@ -3,6 +3,7 @@ import pytest
 CONTEXT_CASES = [
     pytest.param(
         """
+        import numpy as np
         a = np.array([[1, 2], [3, 4]])
         b = a
         """,
@@ -10,6 +11,7 @@ CONTEXT_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((5, 5, 5))
         step_slice = a[0:5:2, :, ::2]
         """,
@@ -17,6 +19,7 @@ CONTEXT_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((5, 5, 5))
         scalar_multi = a[1, 2]
         """,
@@ -24,6 +27,7 @@ CONTEXT_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((5, 5, 5))
         ellipsis_slice = a[..., 0]
         """,
@@ -31,6 +35,7 @@ CONTEXT_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((5, 5, 5))
         negative_slice = a[-2:, :, 0]
         """,
@@ -38,6 +43,7 @@ CONTEXT_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((5, 5, 5))
         negative_index = a[-1]
         """,
@@ -45,6 +51,7 @@ CONTEXT_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((5, 5, 5))
         reverse_slice = a[::-1, ::-1, ::-1]
         """,
@@ -52,6 +59,7 @@ CONTEXT_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3))
         expanded = a[:, None]
         """,
@@ -59,6 +67,7 @@ CONTEXT_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a = np.ones((2, 3))
         selected = a[[0, 1]]
         """,
@@ -66,6 +75,7 @@ CONTEXT_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         global_var = np.zeros((2, 2))
         b = np.ones((3, 3))
         def unannotated_func():
@@ -77,6 +87,7 @@ CONTEXT_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         global_var = np.zeros((2, 2))
         def unannotated_func():
             a = np.ones((5, 5))
@@ -88,6 +99,7 @@ CONTEXT_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         def func(x=np.zeros((2, 3))):
             return x
         res = func()
@@ -96,6 +108,7 @@ CONTEXT_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         def func(x=np.zeros((2, 3))):
             return x
         res = func(np.zeros((4, 4)))
@@ -104,6 +117,7 @@ CONTEXT_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         def func(i=2):
             return np.zeros((i, 3))
         res = func()
@@ -112,6 +126,7 @@ CONTEXT_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         def func(y):
             def inner_func(x):
                 return x
@@ -122,6 +137,7 @@ CONTEXT_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         def func():
             def inner_func(x=np.zeros((2, 3))):
                 return x

@@ -24,6 +24,10 @@ class Environment:
     def functions(self) -> dict[str, Any]:
         return self.stack[-1]["functions"]
 
+    @property
+    def modules(self) -> dict[str, Any]:
+        return self.stack[-1]["modules"]
+
     def __len__(self) -> int:
         return len(self.stack)
 
@@ -45,6 +49,12 @@ class Environment:
                 return frame["functions"][name]
         return None
 
+    def get_module(self, name: str) -> Any | None:
+        for frame in reversed(self.stack):
+            if name in frame["modules"]:
+                return frame["modules"][name]
+        return None
+
     def set_shape(self, name: str, shape: tuple[Any, ...] | ShapeState) -> None:
         self.stack[-1]["shapes"][name] = shape
 
@@ -54,13 +64,22 @@ class Environment:
     def set_function(self, name: str, func: Any) -> None:
         self.stack[-1]["functions"][name] = func
 
+    def set_module(self, name: str, module: Any) -> None:
+        self.stack[-1]["modules"][name] = module
+
     def push_child(self) -> None:
         """Creates a new child environment for local variables and shapes."""
         shapes: dict[str, tuple[Any, ...] | ShapeState] = {}
         scalar_values: dict[str, int | float | ShapeState] = {}
         functions: dict[str, ast.FunctionDef] = {}
+        modules: dict[str, Any] = {}
         self.stack.append(
-            {"shapes": shapes, "scalar_values": scalar_values, "functions": functions}
+            {
+                "shapes": shapes,
+                "scalar_values": scalar_values,
+                "functions": functions,
+                "modules": modules,
+            }
         )
 
     def pop_child(self) -> None:

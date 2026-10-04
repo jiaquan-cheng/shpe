@@ -5,7 +5,7 @@ from typing import Any, Protocol
 from shpe.diagnostics import Diagnostics, ErrorCode
 from shpe.environment import Environment
 from shpe.extractor import Extractor, ShapeState
-from shpe.handlers import Handler
+from shpe.handlers import Registry
 
 
 class StatementWalker(Protocol):
@@ -26,20 +26,20 @@ class Resolver:
         self.env: Environment = env
         self.diagnostics: Diagnostics = diagnostics
         self.active_calls: set[str] = set()
-        self.handler = Handler(self.extractor, self.diagnostics, self)
+        self.registry = Registry(self.extractor, self.diagnostics, self.env, self)
         self.walker: StatementWalker = walker
 
     @property
     def call_handlers(self) -> dict[Any, Callable]:
-        return self.handler.call_handlers
+        return self.registry.call_handlers
 
     @property
     def attr_handlers(self) -> dict[Any, Callable]:
-        return self.handler.attr_handlers
+        return self.registry.attr_handlers
 
     @property
     def binop_handlers(self) -> dict[Any, Callable]:
-        return self.handler.binop_handlers
+        return self.registry.binop_handlers
 
     def shape(self, node: ast.AST | None) -> tuple[int | str, ...] | ShapeState | None:
         """Extracts and infers shape properties from an arbitrary AST expression.

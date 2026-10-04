@@ -142,6 +142,13 @@ class Checker(ast.NodeVisitor):
         """Handles async for loops."""
         self._visit_tainted_block(node.body)
 
+    def visit_Import(self, node: ast.Import) -> None:
+        """Tracks imported modules (e.g., import numpy, import numpy as np)."""
+        for alias in node.names:
+            if alias.name in {"numpy", "torch"}:
+                imported_name = alias.asname if alias.asname else alias.name
+                self.env.set_module(alias.name, imported_name)
+
     def _visit_tainted_block(self, body: list[ast.stmt]) -> None:
         """Walks a block of code and forces any assigned variables to Unknown.
         Used for complex code blocks where we cannot guarantee shape inference.
@@ -150,10 +157,14 @@ class Checker(ast.NodeVisitor):
         Args:
             body: A list of AST statements representing the code block.
         """
+        tainted_variables = set()
         for stmt in body:
             self.visit(stmt)
             for target in ast.walk(stmt):
                 if isinstance(target, ast.Name) and isinstance(target.ctx, ast.Store):
-                    self.env.set_shape(target.id, ShapeState.UNKNOWN)
-                    if target.id in self.env.scalar_values:
-                        self.env.scalar_values[target.id] = ShapeState.UNKNOWN
+                    tainted_variables.add(target.id)
+
+        for var in tainted_variables:
+            self.env.set_shape(var, ShapeState.UNKNOWN)
+            if var in self.env.scalar_values:
+                self.env.scalar_values[var] = ShapeState.UNKNOWN

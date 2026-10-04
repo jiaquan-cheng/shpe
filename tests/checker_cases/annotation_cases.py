@@ -3,6 +3,7 @@ import pytest
 ANNOTATION_CASES = [
     pytest.param(
         """
+        import numpy as np
         n = 5
         m = 3.0
         a: Annotated[np.ndarray, (n, m)] = np.zeros((5, 3))
@@ -12,6 +13,7 @@ ANNOTATION_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         n = 5
         b: Annotated[np.ndarray, (n,)] = np.ones(n)
         """,
@@ -20,6 +22,7 @@ ANNOTATION_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         a: Annotated[np.ndarray, (3,)] = np.zeros((2,))
         """,
         ["Annotation"],
@@ -27,6 +30,7 @@ ANNOTATION_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         def transform(
             x: Annotated[np.ndarray, (10, 20)],
         ) -> Annotated[np.ndarray, (20, 10)]:
@@ -39,6 +43,7 @@ ANNOTATION_CASES = [
     ),
     pytest.param(
         """
+        import numpy as np
         def transform(
             x: Annotated[np.ndarray, (10, 20)],
         ) -> Annotated[np.ndarray, (20, 10)]:

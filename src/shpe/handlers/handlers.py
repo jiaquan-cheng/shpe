@@ -1,109 +1,93 @@
+"""Shape inference handlers for NumPy operations."""
+
 import ast
 import math
-from collections.abc import Callable
-from typing import Any, Protocol
 
+import shpe.handlers.handlers_utils as utils
 from shpe.diagnostics import Diagnostics, ErrorCode
-from shpe.environment import ShapeState
+from shpe.environment import Environment, ShapeState
 from shpe.extractor import Extractor
 
 
-class HandlerResolver(Protocol):
-    def shape(
-        self, node: ast.AST | None
-    ) -> tuple[int | str, ...] | ShapeState | None: ...
-
-
-def map_handlers(handler_mappings: list[tuple]) -> dict[Any, Callable]:
-    return {op: handler for handler, ops in handler_mappings for op in ops}
-
-
-def _broadcast_shapes(
-    shape1: tuple[int | str, ...], shape2: tuple[int | str, ...]
-) -> tuple[int | str, ...] | None:
-    """Broadcasts two shape tuples following standard NumPy right-to-left rules.
-
-    Args:
-        shape1: The first shape tuple.
-        shape2: The second shape tuple.
-
-    Returns:
-        The broadcasted result shape tuple, or None if shapes are incompatible.
-    """
-    len1, len2 = len(shape1), len(shape2)
-    max_len = max(len1, len2)
-
-    p1 = (1,) * (max_len - len1) + shape1
-    p2 = (1,) * (max_len - len2) + shape2
-
-    result = []
-    for d1, d2 in zip(p1, p2, strict=False):
-        if d1 == d2:
-            result.append(d1)
-        elif d1 == 1:
-            result.append(d2)
-        elif d2 == 1:
-            result.append(d1)
-        else:
-            return None
-    return tuple(result)
-
-
-class Handler:
-    """Handles primarily NumPy specific functions"""
+class Registry:
+    """Operation maps for NumPy shape handlers."""
 
     def __init__(
-        self, extractor: Extractor, diagnostic: Diagnostics, resolver: HandlerResolver
+        self,
+        extractor: Extractor,
+        diagnostic: Diagnostics,
+        env: Environment,
+        resolver: utils.HandlerResolver,
     ) -> None:
-        self.extractor: Extractor = extractor
-        self.diagnostics: Diagnostics = diagnostic
-        self.resolver: HandlerResolver = resolver
-        handler_mappings: list[tuple] = [
-            (
-                lambda node: (
-                    self.extractor.literal_shape(node.args[0]) if node.args else None
+        args = (extractor, diagnostic, env, resolver)
+        self.call_handlers = utils.map_handlers(
+            [
+                (Array(*args), ["array", "tensor", "from_numpy"]),
+                (ShapeCreation(*args), ["zeros", "ones", "empty", "full"]),
+                (Reshape(*args), ["reshape"]),
+                (Flatten(*args), ["flatten", "ravel"]),
+                (Squeeze(*args), ["squeeze"]),
+                (ExpandDims(*args), ["expand_dims"]),
+                (Swapaxes(*args), ["swapaxes"]),
+                (Resize(*args), ["resize"]),
+                (
+                    RandomShape(*args),
+                    ["rand", "randn", "random", "random_sample", "ranf", "sample"],
                 ),
-                ["array"],
-            ),
-            (
-                lambda node: self._shape_argument(node, "shape", 0),
-                ["zeros", "ones", "empty", "full"],
-            ),
-            (self._infer_reshape, ["reshape"]),
-            (self._infer_flatten, ["flatten", "ravel"]),
-            (self._infer_squeeze, ["squeeze"]),
-            (self._infer_expand_dims, ["expand_dims"]),
-            (self._infer_swapaxes, ["swapaxes"]),
-            (self._infer_resize, ["resize"]),
-            (
-                self._infer_random_shape,
-                ["rand", "randn", "random", "random_sample", "ranf", "sample"],
-            ),
-            (self._infer_randint_shape, ["randint"]),
-            (self._infer_random_distribution_shape, ["uniform", "normal"]),
-            (self._infer_reduction, ["sum", "mean", "prod", "min", "max"]),
-            (self._infer_arange, ["arange"]),
-            (self._infer_linspace, ["linspace", "logspace", "geomspace"]),
-            (self._infer_meshgrid, ["meshgrid"]),
-        ]
-        attr_mappings: list[tuple] = [
-            (self._infer_transpose, ["T"]),
-        ]
+                (RandintShape(*args), ["randint"]),
+                (RandomDistributionShape(*args), ["uniform", "normal"]),
+                (Reduction(*args), ["sum", "mean", "prod", "min", "max"]),
+                (Arange(*args), ["arange"]),
+                (Linspace(*args), ["linspace", "logspace", "geomspace"]),
+                (Meshgrid(*args), ["meshgrid"]),
+                (Criterion(*args), ["criterion"]),
+            ]
+        )
+        self.attr_handlers = utils.map_handlers([(Transpose(*args), ["T"])])
+        self.binop_handlers = utils.map_handlers(
+            [
+                (MatmultShape(*args), [ast.MatMult]),
+                (ElementwiseShape(*args), [ast.Add, ast.Sub, ast.Mult, ast.Div]),
+            ]
+        )
 
-        binop_mappings: list[tuple] = [
-            (self._infer_matmult_shape, [ast.MatMult]),
-            (self._infer_elementwise_shape, [ast.Add, ast.Sub, ast.Mult, ast.Div]),
-        ]
 
-        self.call_handlers = map_handlers(handler_mappings)
+class Criterion(utils.BaseHandler):
+    def __call__(self, node: ast.Call) -> tuple[int | str, ...] | ShapeState | None:
+        """Infers shape for criterion functions like MSELoss.
 
-        self.attr_handlers = map_handlers(attr_mappings)
+        Args:
+            node: The `ast.Call` node representing the criterion function call.
 
-        self.binop_handlers = map_handlers(binop_mappings)
+        Returns:
+            The inferred shape tuple, or None.
+        """
+        if not node.args or len(node.args) < 2:
+            return None
+        left_shape = self.resolver.shape(node.args[0])
+        right_shape = self.resolver.shape(node.args[1])
+        if left_shape is ShapeState.UNKNOWN or right_shape is ShapeState.UNKNOWN:
+            return ShapeState.UNKNOWN
+        if right_shape is None or left_shape is None:
+            return None
+        broadcasted = utils.broadcast_shapes(left_shape, right_shape)
+        if broadcasted is None:
+            left_name = ast.unparse(node.args[0])
+            right_name = ast.unparse(node.args[1])
+            self.diagnostics.error(
+                node,
+                ErrorCode.ELEMENTWISE,
+                (
+                    f"cannot calculate loss between {left_name} {left_shape}"
+                    f" and {right_name} {right_shape}. "
+                ),
+            )
+            return None
+        return ()
 
-    def _infer_reshape(
-        self, node: ast.Call
-    ) -> tuple[int | str, ...] | ShapeState | None:
+
+class Reshape(utils.BaseHandler):
+    def __call__(self, node: ast.Call) -> tuple[int | str, ...] | ShapeState | None:
         """Infers and validates shape changes resulting from a reshape operation.
 
         Args:
@@ -112,7 +96,7 @@ class Handler:
         Returns:
             The new shape tuple after validation, or None if validation fails.
         """
-        old_shape, args = self._infer_call_target(node)
+        old_shape, args = utils.infer_call_target(node, self.resolver, self.env)
 
         if old_shape is None:
             return None
@@ -184,9 +168,9 @@ class Handler:
         )
         return None
 
-    def _infer_flatten(
-        self, node: ast.Call
-    ) -> tuple[int | str, ...] | ShapeState | None:
+
+class Flatten(utils.BaseHandler):
+    def __call__(self, node: ast.Call) -> tuple[int | str, ...] | ShapeState | None:
         """Infers the resulting shape for flatten or ravel operations.
 
         Args:
@@ -195,16 +179,16 @@ class Handler:
         Returns:
             A 1-dimensional tuple containing the product of the original shape, or None.
         """
-        shape, _ = self._infer_call_target(node)
+        shape, _ = utils.infer_call_target(node, self.resolver, self.env)
         if shape is not None and shape is not ShapeState.UNKNOWN:
             return (math.prod(shape),)
         if shape is ShapeState.UNKNOWN:
             return ShapeState.UNKNOWN
         return None
 
-    def _infer_squeeze(
-        self, node: ast.Call
-    ) -> tuple[int | str, ...] | ShapeState | None:
+
+class Squeeze(utils.BaseHandler):
+    def __call__(self, node: ast.Call) -> tuple[int | str, ...] | ShapeState | None:
         """Infers shape changes from squeeze operations, optionally along specific axes.
 
         Args:
@@ -213,7 +197,7 @@ class Handler:
         Returns:
             The squeezed shape tuple, or None if invalid.
         """
-        shape, args = self._infer_call_target(node)
+        shape, args = utils.infer_call_target(node, self.resolver, self.env)
         if shape is None:
             return None
         if shape is ShapeState.UNKNOWN:
@@ -248,9 +232,9 @@ class Handler:
             dimension for index, dimension in enumerate(shape) if index not in axes
         )
 
-    def _infer_expand_dims(
-        self, node: ast.Call
-    ) -> tuple[int | str, ...] | ShapeState | None:
+
+class ExpandDims(utils.BaseHandler):
+    def __call__(self, node: ast.Call) -> tuple[int | str, ...] | ShapeState | None:
         """Infers shape changes from expanding array dimensions.
 
         Args:
@@ -259,7 +243,7 @@ class Handler:
         Returns:
             The expanded shape tuple with inserted dimensions, or None.
         """
-        shape, args = self._infer_call_target(node)
+        shape, args = utils.infer_call_target(node, self.resolver, self.env)
         if shape is None:
             return None
         if shape is ShapeState.UNKNOWN:
@@ -287,9 +271,9 @@ class Handler:
         insert_at = axis if axis >= 0 else len(shape) + axis + 1
         return (*shape[:insert_at], 1, *shape[insert_at:])
 
-    def _infer_swapaxes(
-        self, node: ast.Call
-    ) -> tuple[int | str, ...] | ShapeState | None:
+
+class Swapaxes(utils.BaseHandler):
+    def __call__(self, node: ast.Call) -> tuple[int | str, ...] | ShapeState | None:
         """Infers shape changes from swapping two axes of an array.
 
         Args:
@@ -298,7 +282,7 @@ class Handler:
         Returns:
             The shape tuple with swapped axes, or None if axes are invalid.
         """
-        shape, args = self._infer_call_target(node)
+        shape, args = utils.infer_call_target(node, self.resolver, self.env)
         if shape is ShapeState.UNKNOWN:
             return ShapeState.UNKNOWN
         if shape is None or len(args) < 2:
@@ -339,9 +323,9 @@ class Handler:
         )
         return tuple(swapped_shape)
 
-    def _infer_resize(
-        self, node: ast.Call
-    ) -> tuple[int | str, ...] | ShapeState | None:
+
+class Resize(utils.BaseHandler):
+    def __call__(self, node: ast.Call) -> tuple[int | str, ...] | ShapeState | None:
         """Infers shape for resize operations using call target extraction.
 
         Args:
@@ -359,14 +343,16 @@ class Handler:
                 "In-place resize detected. The shape may not be accurately inferred.",
             )
 
-        shape, args = self._infer_call_target(node)
+        shape, args = utils.infer_call_target(node, self.resolver, self.env)
         if shape is ShapeState.UNKNOWN:
             return ShapeState.UNKNOWN
         if shape is None or not args:
             return None
         return self.extractor.expr_shape(args[0])
 
-    def _infer_transpose(
+
+class Transpose(utils.BaseHandler):
+    def __call__(
         self, node: ast.Attribute
     ) -> tuple[int | str, ...] | ShapeState | None:
         """Infers shape for attribute-based transposition (`.T`).
@@ -384,7 +370,9 @@ class Handler:
             return tuple(reversed(shape))
         return None
 
-    def _infer_matmult_shape(
+
+class MatmultShape(utils.BaseHandler):
+    def __call__(
         self,
         node: ast.BinOp,
         left_shape: tuple[int | str, ...],
@@ -424,7 +412,7 @@ class Handler:
             )
             return None
 
-        broadcast_batch = _broadcast_shapes(batch_left, batch_right)
+        broadcast_batch = utils.broadcast_shapes(batch_left, batch_right)
         if broadcast_batch is None:
             left_name = ast.unparse(node.left)
             right_name = ast.unparse(node.right)
@@ -448,7 +436,9 @@ class Handler:
 
         return result
 
-    def _infer_elementwise_shape(
+
+class ElementwiseShape(utils.BaseHandler):
+    def __call__(
         self,
         node: ast.BinOp,
         left_shape: tuple[int | str, ...],
@@ -464,7 +454,7 @@ class Handler:
         Returns:
             The resulting matrix multiplication shape, or None if dimensions mismatch.
         """
-        broadcasted = _broadcast_shapes(left_shape, right_shape)
+        broadcasted = utils.broadcast_shapes(left_shape, right_shape)
         if broadcasted is None:
             left_name = ast.unparse(node.left)
             right_name = ast.unparse(node.right)
@@ -479,9 +469,9 @@ class Handler:
             return None
         return broadcasted
 
-    def _infer_random_shape(
-        self, node: ast.Call
-    ) -> tuple[int | str, ...] | ShapeState | None:
+
+class RandomShape(utils.BaseHandler):
+    def __call__(self, node: ast.Call) -> tuple[int | str, ...] | ShapeState | None:
         """Infers shape for random generation calls.
 
         Args:
@@ -515,18 +505,9 @@ class Handler:
                 return None
         return tuple(shape) if shape else None
 
-    def _shape_argument(
-        self, node: ast.Call, keyword: str, position: int
-    ) -> tuple[int | str, ...] | ShapeState | None:
-        argument = next(
-            (kw.value for kw in node.keywords if kw.arg == keyword),
-            node.args[position] if len(node.args) > position else None,
-        )
-        return self.extractor.expr_shape(argument) if argument is not None else None
 
-    def _infer_randint_shape(
-        self, node: ast.Call
-    ) -> tuple[int | str, ...] | ShapeState | None:
+class RandintShape(utils.BaseHandler):
+    def __call__(self, node: ast.Call) -> tuple[int | str, ...] | ShapeState | None:
         """Infers shape for integer random generation functions via keyword or position.
 
         Args:
@@ -551,9 +532,9 @@ class Handler:
             return self.extractor.expr_shape(size_node)
         return None
 
-    def _infer_random_distribution_shape(
-        self, node: ast.Call
-    ) -> tuple[int | str, ...] | ShapeState | None:
+
+class RandomDistributionShape(utils.BaseHandler):
+    def __call__(self, node: ast.Call) -> tuple[int | str, ...] | ShapeState | None:
         """Infers shape for continuous distribution functions using the size keyword.
 
         Args:
@@ -571,9 +552,9 @@ class Handler:
 
         return None
 
-    def _infer_reduction(
-        self, node: ast.Call
-    ) -> tuple[int | str, ...] | ShapeState | None:
+
+class Reduction(utils.BaseHandler):
+    def __call__(self, node: ast.Call) -> tuple[int | str, ...] | ShapeState | None:
         """Infers shape changes resulting from reduction operations (sum, mean, max).
 
         Args:
@@ -582,7 +563,7 @@ class Handler:
         Returns:
             The reduced shape tuple, or None.
         """
-        shape, args = self._infer_call_target(node)
+        shape, args = utils.infer_call_target(node, self.resolver, self.env)
         if shape is ShapeState.UNKNOWN:
             return ShapeState.UNKNOWN
         if shape is None:
@@ -641,9 +622,9 @@ class Handler:
             dimension for index, dimension in enumerate(shape) if index not in axes
         )
 
-    def _infer_arange(
-        self, node: ast.Call
-    ) -> tuple[int | str, ...] | ShapeState | None:
+
+class Arange(utils.BaseHandler):
+    def __call__(self, node: ast.Call) -> tuple[int | str, ...] | ShapeState | None:
         """Infers shape for range-based array creation functions like `np.arange`.
 
         Args:
@@ -695,9 +676,9 @@ class Handler:
 
         return None
 
-    def _infer_linspace(
-        self, node: ast.Call
-    ) -> tuple[int | str, ...] | ShapeState | None:
+
+class Linspace(utils.BaseHandler):
+    def __call__(self, node: ast.Call) -> tuple[int | str, ...] | ShapeState | None:
         """Infers shape for logarithmically or linearly spaced sequence functions.
 
         Args:
@@ -726,9 +707,9 @@ class Handler:
         # Default num for linspace/logspace/geomspace is 50 if omitted
         return (50,)
 
-    def _infer_meshgrid(
-        self, node: ast.Call
-    ) -> tuple[int | str, ...] | ShapeState | None:
+
+class Meshgrid(utils.BaseHandler):
+    def __call__(self, node: ast.Call) -> tuple[int | str, ...] | ShapeState | None:
         """Infers shape coordinates resulting from coordinate matrix creation.
 
         Args:
@@ -765,28 +746,16 @@ class Handler:
 
         return tuple(input_shapes)
 
-    def _infer_call_target(
-        self, node: ast.Call
-    ) -> tuple[tuple[int | str, ...] | ShapeState | None, list[ast.AST]]:
-        """Normalizes a call node, returning target shape and remaining arguments.
 
-        Handles both method calls (`arr.op(arg)`) and func calls (`np.op(arr, arg)`).
+class Array(utils.BaseHandler):
+    def __call__(self, node: ast.Call) -> tuple[int | str, ...] | ShapeState | None:
+        return self.extractor.literal_shape(node.args[0]) if node.args else None
 
-        Args:
-            node: The `ast.Call` node to normalize.
 
-        Returns:
-            A tuple of (target_shape, remaining_args).
-        """
-        # Check if method call
-        if isinstance(node.func, ast.Attribute):
-            receiver_shape = self.resolver.shape(node.func.value)
-            if receiver_shape is not None:
-                return receiver_shape, list(node.args)
-
-        # Else function call
-        if node.args:
-            target_shape = self.resolver.shape(node.args[0])
-            return target_shape, list(node.args[1:])
-
-        return None, list(node.args)
+class ShapeCreation(utils.BaseHandler):
+    def __call__(self, node: ast.Call) -> tuple[int | str, ...] | ShapeState | None:
+        shape_node = next(
+            (keyword.value for keyword in node.keywords if keyword.arg == "shape"),
+            node.args[0] if node.args else None,
+        )
+        return self.extractor.expr_shape(shape_node) if shape_node is not None else None
