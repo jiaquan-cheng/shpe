@@ -1,6 +1,6 @@
 .PHONY: all help setup lint lint-fix unsafe format format-check test pypi-check vscode-setup vscode-check vscode-package pycharm-check pycharm-verify pycharm-package clean
 
-all: format-check lint test pypi-check vscode-check
+all: format-check lint test
 
 # core
 
@@ -44,6 +44,13 @@ format-check:
 
 test:
 	uv run pytest
+
+# development
+
+dump-sandbox:
+	uv run scripts/dump_ast.py examples/sandbox.py
+
+# pypi
 
 pypi-check:
 	uv build

@@ -87,7 +87,13 @@ class Resolver:
         Returns:
             The inferred shape tuple, or None if the function is uninferrable.
         """
+        if isinstance(node.func, ast.Attribute) and isinstance(
+            node.func.value, ast.Name
+        ):
+            pass
+
         func_name = ast.unparse(node.func)
+        print(f"Function name: {func_name}")
 
         # Check if it's a user-defined function call
         function = self.env.get_function(func_name)

@@ -40,6 +40,12 @@ jobs:
       - name: Run Linting and Tests via Makefile
         run: make all
 
+      - name: Check PyPI Package
+        run: make pypi-check
+      
+      - name: Check VS Code Extension
+        run: make vscode-check
+
   pycharm-build:
     needs: [quality-check]
     runs-on: ubuntu-latest

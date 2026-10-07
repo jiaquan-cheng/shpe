@@ -149,6 +149,12 @@ class Checker(ast.NodeVisitor):
                 imported_name = alias.asname if alias.asname else alias.name
                 self.env.set_module(alias.name, imported_name)
 
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        """Tracks class definitions (e.g., class MyClass:)."""
+        self.env.push_child()
+        self.generic_visit(node)
+        self.env.pop_child()
+
     def _visit_tainted_block(self, body: list[ast.stmt]) -> None:
         """Walks a block of code and forces any assigned variables to Unknown.
         Used for complex code blocks where we cannot guarantee shape inference.
