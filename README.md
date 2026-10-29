@@ -11,9 +11,6 @@ A lightweight static analyzer for tracking and validating NumPy tensor shapes. I
 ## VS Code Demo
 ![VS Code Image not loaded.](https://raw.githubusercontent.com/jiaquan-cheng/shpe/main/assets/vscode_intro.png)
 
-## PyCharm Demo
-![PyCharm Image not loaded.](https://raw.githubusercontent.com/jiaquan-cheng/shpe/main/assets/pycharm_intro.png)
-
 ## Install
 
 Requires Python 3.12+.

@@ -2,6 +2,8 @@ import ast
 from enum import Enum
 from typing import Any
 
+from shpe.environment import Shape
+
 
 class ErrorCode(Enum):
     ANNOTATION = "Annotation"
@@ -73,7 +75,7 @@ class Diagnostics:
             {"line": line, "col": col, "end_col": end_col, "message": message}
         )
 
-    def hint(self, node: ast.AST, shape: tuple[Any, ...]) -> None:
+    def hint(self, node: ast.AST, shape: Shape) -> None:
         if not self.active_hint_collection:
             return
         self.inlay_hints.append(

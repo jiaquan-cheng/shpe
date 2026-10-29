@@ -3,8 +3,8 @@ from collections.abc import Callable
 from typing import Any, Protocol
 
 from shpe.diagnostics import Diagnostics, ErrorCode
-from shpe.environment import Environment
-from shpe.extractor import Extractor, ShapeState
+from shpe.environment import Environment, Shape, ShapeState
+from shpe.extractor import Extractor
 from shpe.handlers import Registry
 
 
@@ -41,7 +41,7 @@ class Resolver:
     def binop_handlers(self) -> dict[Any, Callable]:
         return self.registry.binop_handlers
 
-    def shape(self, node: ast.AST | None) -> tuple[int | str, ...] | ShapeState | None:
+    def shape(self, node: ast.AST | None) -> Shape | ShapeState | None:
         """Extracts and infers shape properties from an arbitrary AST expression.
 
         Args:
@@ -65,7 +65,7 @@ class Resolver:
         if isinstance(node, ast.Constant) and isinstance(
             node.value, (int, float, bool)
         ):
-            return ()
+            return Shape(())
 
         if isinstance(node, (ast.Tuple, ast.List)):
             return self.extractor.literal_shape(node)
@@ -77,7 +77,7 @@ class Resolver:
             return self.subscript_shape(node)
         return None
 
-    def call_shape(self, node: ast.Call) -> tuple[int | str, ...] | ShapeState | None:
+    def call_shape(self, node: ast.Call) -> Shape | ShapeState | None:
         """Infers the shape of a function or method call node.
         Handles both user-defined function and NumPy functions.
 
@@ -93,7 +93,6 @@ class Resolver:
             pass
 
         func_name = ast.unparse(node.func)
-        print(f"Function name: {func_name}")
 
         # Check if it's a user-defined function call
         function = self.env.get_function(func_name)
@@ -106,9 +105,7 @@ class Resolver:
                 return handler(node)
         return None
 
-    def attribute_shape(
-        self, node: ast.Attribute
-    ) -> tuple[int | str, ...] | ShapeState | None:
+    def attribute_shape(self, node: ast.Attribute) -> Shape | ShapeState | None:
         """Handles attribute-based shape changes, such as `.T` (transpose).
 
         Args:
@@ -122,7 +119,7 @@ class Resolver:
             return handler(node)
         return None
 
-    def binop_shape(self, node: ast.BinOp) -> tuple[int | str, ...] | ShapeState | None:
+    def binop_shape(self, node: ast.BinOp) -> Shape | ShapeState | None:
         """Infers and validates shapes for binary operations like `+`, `-`, and `@`.
 
         Args:
@@ -136,17 +133,17 @@ class Resolver:
 
         if left_shape is None or right_shape is None:
             return None
-        if left_shape is ShapeState.UNKNOWN or right_shape is ShapeState.UNKNOWN:
-            return ShapeState.UNKNOWN
+        if isinstance(left_shape, ShapeState):
+            return left_shape
+        if isinstance(right_shape, ShapeState):
+            return right_shape
 
         handler = self.binop_handlers.get(type(node.op))
         if handler:
             return handler(node, left_shape, right_shape)
         return None
 
-    def user_function_def(
-        self, node: ast.FunctionDef
-    ) -> tuple[int | str, ...] | ShapeState | None:
+    def user_function_def(self, node: ast.FunctionDef) -> Shape | ShapeState | None:
         """Handels user-defined function calls.
 
         Args:
@@ -181,7 +178,7 @@ class Resolver:
 
     def user_function_call(
         self, node: ast.Call, func_node: ast.FunctionDef
-    ) -> tuple[int | str, ...] | ShapeState | None:
+    ) -> Shape | ShapeState | None:
         """Handels user-defined function calls.
 
         Args:
@@ -215,9 +212,7 @@ class Resolver:
             self.active_calls.remove(func_name)
             self.diagnostics.activate_hints()
 
-    def function_body_shape(
-        self, body: list[ast.stmt]
-    ) -> tuple[int | str, ...] | ShapeState | None:
+    def function_body_shape(self, body: list[ast.stmt]) -> Shape | ShapeState | None:
         """Walks through function body statements and tracks the final return shape.
 
         Args:
@@ -231,10 +226,7 @@ class Resolver:
             self.walker.visit(stmt)
             if isinstance(stmt, ast.Return):
                 inferred_return_shape = self.shape(stmt.value)
-            if (
-                inferred_return_shape is not None
-                and inferred_return_shape is not ShapeState.UNKNOWN
-            ):
+            if isinstance(inferred_return_shape, Shape):
                 self.diagnostics.hint(stmt, inferred_return_shape)
         return inferred_return_shape
 
@@ -272,18 +264,11 @@ class Resolver:
             ):
                 scalar_val = expr_node.value
             if scalar_val is not None:
-                if hasattr(self.env.scalar_values, "set"):
-                    self.env.scalar_values.set(param.arg, scalar_val)
-                else:
-                    self.env.scalar_values[param.arg] = scalar_val
+                self.env.set_scalar(param.arg, scalar_val)
 
-            if param.annotation and arg_shape and arg_shape is not ShapeState.UNKNOWN:
+            if param.annotation and isinstance(arg_shape, Shape):
                 expected_shape = self.extractor.annotation_shape(param.annotation)
-                if (
-                    expected_shape is not None
-                    and expected_shape is not ShapeState.UNKNOWN
-                    and expected_shape != arg_shape
-                ):
+                if isinstance(expected_shape, Shape) and expected_shape != arg_shape:
                     self.diagnostics.error(
                         node if node is not None else func_node,
                         ErrorCode.ANNOTATION,
@@ -293,9 +278,7 @@ class Resolver:
                         ),
                     )
 
-    def subscript_shape(
-        self, node: ast.Subscript
-    ) -> tuple[int | str, ...] | ShapeState | None:
+    def subscript_shape(self, node: ast.Subscript) -> Shape | ShapeState | None:
         """Infers shape resulting from array slicing and indexing operations (`a[1:3]`).
 
         Args:
@@ -314,15 +297,15 @@ class Resolver:
             return self.shape(node.value)
 
         shape = self.shape(node.value)
-        if shape is ShapeState.UNKNOWN:
-            return ShapeState.UNKNOWN
+        if isinstance(shape, ShapeState):
+            return shape
         if shape is None:
             return None
 
         slice_node = node.slice
         slices = slice_node.elts if isinstance(slice_node, ast.Tuple) else [slice_node]
 
-        result_shape: list[int | str] = []
+        result_shape: list[int] = []
         shape_idx = 0
 
         for s in slices:
@@ -351,17 +334,21 @@ class Resolver:
                 shape_idx += 1
             elif isinstance(s, (ast.List, ast.Tuple)):
                 index_shape = self.extractor.literal_shape(s)
-                if isinstance(index_shape, tuple):
-                    result_shape.extend(index_shape)
+                if isinstance(index_shape, Shape):
+                    result_shape.extend(index_shape.dims)
+                elif isinstance(index_shape, ShapeState):
+                    return index_shape
                 shape_idx += 1
             else:
                 advanced_shape = self.shape(s)
-                if isinstance(advanced_shape, tuple):
-                    result_shape.extend(advanced_shape)
+                if isinstance(advanced_shape, Shape):
+                    result_shape.extend(advanced_shape.dims)
+                elif isinstance(advanced_shape, ShapeState):
+                    return advanced_shape
                 shape_idx += 1
 
         while shape_idx < len(shape):
             result_shape.append(shape[shape_idx])
             shape_idx += 1
 
-        return tuple(result_shape)
+        return Shape(tuple(result_shape))

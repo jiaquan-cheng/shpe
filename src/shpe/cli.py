@@ -3,10 +3,9 @@ import ast
 import importlib.metadata
 import sys
 from pathlib import Path
-from typing import Any
 
 from shpe.checker import Checker
-from shpe.environment import ShapeState
+from shpe.environment import ScalarValue, ShapeState, Tensor, ValueState
 
 try:
     __version__ = importlib.metadata.version("shpe")
@@ -32,8 +31,8 @@ def main() -> None:
 
     files = discover_files(args.paths)
     all_errors: list[str] = []
-    all_shapes: dict[Path, dict[str, tuple[Any, ...] | ShapeState]] = {}
-    all_scalars: dict[Path, dict[str, int | float | ShapeState]] = {}
+    all_shapes: dict[Path, dict[str, Tensor]] = {}
+    all_scalars: dict[Path, dict[str, ScalarValue]] = {}
 
     for filepath in files:
         file_errors, shapes, scalars = _process_file(filepath)
@@ -87,8 +86,8 @@ def _process_file(
     filepath: Path,
 ) -> tuple[
     list[str],
-    dict[str, tuple[Any, ...] | ShapeState],
-    dict[str, int | float | ShapeState],
+    dict[str, Tensor],
+    dict[str, ScalarValue],
 ]:
     """Processes a single source file, running syntax checks and shape analysis.
 
@@ -139,8 +138,8 @@ def _process_file(
 
 
 def _print_shape_report(
-    all_shapes: dict[Path, dict[str, tuple[Any, ...] | ShapeState]],
-    all_scalars: dict[Path, dict[str, int | float | ShapeState]],
+    all_shapes: dict[Path, dict[str, Tensor]],
+    all_scalars: dict[Path, dict[str, ScalarValue]],
 ) -> None:
     """Prints a formatted report of all inferred shapes and scalar values across files.
 
@@ -158,29 +157,36 @@ def _print_shape_report(
         if scalars:
             print("  Scalars:")
             for name, val in sorted(scalars.items()):
-                val_str = "unknown" if val is ShapeState.UNKNOWN else val
+                val_str = (
+                    "unknown"
+                    if val.value is ValueState.UNKNOWN
+                    else "undefined"
+                    if val.value is ValueState.UNDEFINED
+                    else val.value
+                )
                 print(f"    - {name} = {val_str}")
 
         if symbols:
             print("  Shapes:")
-            symbols_with_no_shape: list[str] = []
             symbols_with_unknown_shape: list[str] = []
+            symbols_with_undefined_shape: list[str] = []
             for var_name, shape in sorted(symbols.items()):
-                if shape is ShapeState.UNKNOWN:
+                if shape.shape is ShapeState.UNKNOWN:
                     symbols_with_unknown_shape.append(var_name)
-                elif shape is not None:
-                    print(f"    - {var_name}: {shape}")
+                elif shape.shape is ShapeState.UNDEFINED:
+                    symbols_with_undefined_shape.append(var_name)
                 else:
-                    symbols_with_no_shape.append(var_name)
+                    print(f"    - {var_name}: {shape.shape}")
 
             if symbols_with_unknown_shape:
                 print(
                     "    - unknown shape (tainted) for: "
                     f"{', '.join(symbols_with_unknown_shape)}"
                 )
-            if symbols_with_no_shape:
+            if symbols_with_undefined_shape:
                 print(
-                    f"    - no shape inferred for: {', '.join(symbols_with_no_shape)}"
+                    "    - undefined shape for: "
+                    f"{', '.join(symbols_with_undefined_shape)}"
                 )
 
         if not symbols and not scalars:

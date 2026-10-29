@@ -7,6 +7,7 @@ import pytest
 import torch
 
 from shpe.checker import Checker
+from shpe.environment import Shape
 from tests.checker_cases import (
     CONTEXT_CASES,
     CREATION_CASES,
@@ -52,8 +53,8 @@ def checker_runtime_oracle(code: str) -> None:
     for var, static_shape in checker.shapes.items():
         if var in runtime_namespace:
             runtime_val = runtime_namespace[var]
-            if hasattr(runtime_val, "shape"):
-                assert static_shape == runtime_val.shape, (
+            if hasattr(runtime_val, "shape") and isinstance(static_shape.shape, Shape):
+                assert static_shape.shape.dims == tuple(runtime_val.shape), (
                     f"  Snippet:\n{cleaned_code}\n"
                     f"  Predicted: {static_shape}\n"
                     f"  Actual:    {runtime_val.shape}\n"

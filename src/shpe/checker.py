@@ -2,7 +2,15 @@ import ast
 from typing import Any
 
 from shpe.diagnostics import Diagnostics, ErrorCode
-from shpe.environment import Environment, ShapeState
+from shpe.environment import (
+    AbstractObject,
+    Environment,
+    ScalarValue,
+    Shape,
+    ShapeState,
+    Tensor,
+    ValueState,
+)
 from shpe.extractor import Extractor
 from shpe.resolver import Resolver
 
@@ -22,12 +30,12 @@ class Checker(ast.NodeVisitor):
         )
 
     @property
-    def shapes(self) -> dict[str, tuple[Any, ...] | ShapeState]:
+    def shapes(self) -> dict[str, Tensor]:
         """Convenience property for tests and CLI to access global shapes."""
         return self.env.shapes
 
     @property
-    def scalar_values(self) -> dict[str, int | float | ShapeState]:
+    def scalar_values(self) -> dict[str, ScalarValue]:
         """Convenience property for tests and CLI to access global scalar values."""
         return self.env.scalar_values
 
@@ -68,14 +76,14 @@ class Checker(ast.NodeVisitor):
         if resolved_shape is None:
             resolved_shape = ShapeState.UNKNOWN
         self.env.set_shape(var_name, resolved_shape)
+        if node.value is not None:
+            self._track_abstract_object(var_name, node.value)
 
-        if inferred_shape is not None and inferred_shape is not ShapeState.UNKNOWN:
+        if isinstance(inferred_shape, Shape):
             self.diagnostics.hint(node, inferred_shape)
         if (
-            annotated_shape is not None
-            and inferred_shape is not None
-            and annotated_shape is not ShapeState.UNKNOWN
-            and inferred_shape is not ShapeState.UNKNOWN
+            isinstance(annotated_shape, Shape)
+            and isinstance(inferred_shape, Shape)
             and annotated_shape != inferred_shape
         ):
             self.diagnostics.error(
@@ -101,7 +109,7 @@ class Checker(ast.NodeVisitor):
 
         inferred_shape = self.resolver.shape(node.value) if node.value else None
 
-        if inferred_shape is not None and inferred_shape is not ShapeState.UNKNOWN:
+        if isinstance(inferred_shape, Shape):
             self.diagnostics.hint(node, inferred_shape)
 
         shape_to_set = (
@@ -110,6 +118,7 @@ class Checker(ast.NodeVisitor):
         for target in node.targets:
             if isinstance(target, ast.Name):
                 self.env.set_shape(target.id, shape_to_set)
+                self._track_abstract_object(target.id, node.value)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         """Tracks custom function definitions."""
@@ -151,9 +160,23 @@ class Checker(ast.NodeVisitor):
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """Tracks class definitions (e.g., class MyClass:)."""
+        self.env.set_class(node.name, node)
         self.env.push_child()
         self.generic_visit(node)
         self.env.pop_child()
+
+    def _track_abstract_object(self, name: str, value: ast.AST) -> None:
+        """Record instances of locally defined classes and aliases to them."""
+        class_def: ast.ClassDef | None = None
+        if isinstance(value, ast.Call) and isinstance(value.func, ast.Name):
+            class_def = self.env.get_class(value.func.id)
+        elif isinstance(value, ast.Name):
+            existing_object = self.env.get_object(value.id)
+            if existing_object is not None:
+                class_def = existing_object.class_def
+
+        if class_def is not None:
+            self.env.set_object(name, AbstractObject(name, class_def))
 
     def _visit_tainted_block(self, body: list[ast.stmt]) -> None:
         """Walks a block of code and forces any assigned variables to Unknown.
@@ -173,4 +196,4 @@ class Checker(ast.NodeVisitor):
         for var in tainted_variables:
             self.env.set_shape(var, ShapeState.UNKNOWN)
             if var in self.env.scalar_values:
-                self.env.scalar_values[var] = ShapeState.UNKNOWN
+                self.env.set_scalar(var, ValueState.UNKNOWN)

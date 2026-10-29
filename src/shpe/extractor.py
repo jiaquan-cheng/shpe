@@ -2,34 +2,24 @@ import ast
 import math
 
 from shpe.diagnostics import Diagnostics, ErrorCode
-from shpe.environment import Environment, ShapeState
+from shpe.environment import Environment, Shape, ShapeState, ValueState
 
 
 class Extractor:
-    """Extracts the shape from the leaf nodes."""
+    """Extracts shapes and scalar values from leaf AST nodes."""
 
     def __init__(self, env: Environment, diagnostics: Diagnostics) -> None:
         self.env = env
         self.diagnostics = diagnostics
 
-    def dim_value(self, node: ast.AST | None) -> int | str | ShapeState | None:
-        """Extracts a scalar integer/float value from an AST node for dim calculations.
-
-        Args:
-            node: The AST node containing a scalar value or variable name.
-
-        Returns:
-            The extracted integer/string value, or None if unextractable.
-        """
-        value: int | float | ShapeState | None = None
-
+    def dim_value(self, node: ast.AST | None) -> int | ShapeState | None:
+        """Extract an integer dimension or scalar value from an AST node."""
         if node is None:
             return None
 
         if isinstance(node, ast.Constant) and isinstance(node.value, int):
             return node.value
 
-        # Negative integer via unary minus
         if (
             isinstance(node, ast.UnaryOp)
             and isinstance(node.op, ast.USub)
@@ -37,39 +27,35 @@ class Extractor:
             and isinstance(node.operand.value, (int, float))
         ):
             value = node.operand.value
-            if value.is_integer():
-                return -int(value)
-
-        if isinstance(node, ast.Name):
-            value = self.env.get_scalar(node.id)
-
-            if value is None:
+            if isinstance(value, float) and not value.is_integer():
                 return None
-            if value is ShapeState.UNKNOWN:
-                return ShapeState.UNKNOWN
+            return -int(value)
 
-            if value is not None and not float(value).is_integer():
-                self.diagnostics.error(
-                    node,
-                    ErrorCode.VALUE,
-                    f"Scalar variable '{node.id}' must be an integer, got {value}.",
-                )
-                return None
-            return int(value)
+        if not isinstance(node, ast.Name):
+            return None
 
-        return None
+        scalar = self.env.get_scalar(node.id)
+        if scalar is None:
+            return None
+        scalar_value = scalar.value
+        if scalar_value is ValueState.UNKNOWN:
+            return ShapeState.UNKNOWN
+        if scalar_value is ValueState.UNDEFINED:
+            return ShapeState.UNDEFINED
+        if not isinstance(scalar_value, (int, float)):
+            return None
 
-    def annotation_shape(
-        self, node: ast.AST
-    ) -> tuple[int | str, ...] | ShapeState | None:
-        """Extracts explicit shape tuples from type annotations using `Annotated`.
+        if not float(scalar_value).is_integer():
+            self.diagnostics.error(
+                node,
+                ErrorCode.VALUE,
+                f"Scalar variable '{node.id}' must be an integer, got {scalar_value}.",
+            )
+            return None
+        return int(scalar_value)
 
-        Args:
-            node: The AST node representing the type annotation.
-
-        Returns:
-            The extracted shape tuple, or None.
-        """
+    def annotation_shape(self, node: ast.AST) -> Shape | ShapeState | None:
+        """Extract an explicit shape from an ``Annotated`` type annotation."""
         if not isinstance(node, ast.Subscript):
             return None
         if not (isinstance(node.value, ast.Name) and node.value.id == "Annotated"):
@@ -79,140 +65,116 @@ class Extractor:
         if not isinstance(slice_node, ast.Tuple) or len(slice_node.elts) != 2:
             return None
 
-        elt = slice_node.elts[1]
-        if not isinstance(elt, (ast.Tuple, ast.List)):
+        shape_node = slice_node.elts[1]
+        if not isinstance(shape_node, (ast.Tuple, ast.List)):
             return None
 
-        shape: list[int | str] = []
-        for item in elt.elts:
-            val = self.dim_value(item)
-            if val is None:
+        dims: list[int] = []
+        for item in shape_node.elts:
+            value = self.dim_value(item)
+            if value is None:
                 return None
-            if val is ShapeState.UNKNOWN:
-                return ShapeState.UNKNOWN
-            shape.append(val)
+            if isinstance(value, ShapeState):
+                return value
+            dims.append(value)
+        return Shape(tuple(dims))
 
-        return tuple(shape)
-
-    def expr_shape(self, node: ast.AST) -> tuple[int | str, ...] | ShapeState | None:
-        """Extracts shape from a literal list/tuple of dim or a scalar expression.
-
-        Args:
-            node: The AST expression node representing dimensions.
-
-        Returns:
-            The shape tuple, or None.
-        """
-        top_val = self.dim_value(node)
-        if top_val is ShapeState.UNKNOWN:
-            return ShapeState.UNKNOWN
-        if top_val is not None:
-            return (top_val,)
+    def expr_shape(self, node: ast.AST) -> Shape | ShapeState | None:
+        """Extract dimensions from a scalar or a tuple/list expression."""
+        top_value = self.dim_value(node)
+        if isinstance(top_value, ShapeState):
+            return top_value
+        if top_value is not None:
+            return Shape((top_value,))
 
         if not isinstance(node, (ast.List, ast.Tuple)):
             return None
-
         if not node.elts:
-            return ()
+            return Shape(())
 
-        shape: list[int | str] = []
+        dims: list[int] = []
         for elt in node.elts:
-            val = self.dim_value(elt)
-            if val is ShapeState.UNKNOWN:
-                return ShapeState.UNKNOWN
-            if val is not None:
-                shape.append(val)
-            else:
+            value = self.dim_value(elt)
+            if isinstance(value, ShapeState):
+                return value
+            if value is None:
                 return None
+            dims.append(value)
+        return Shape(tuple(dims))
 
-        return tuple(shape) if shape is not None else None
-
-    def literal_shape(self, node: ast.AST) -> tuple[int, ...] | ShapeState | None:
-        """Calculates the recursive shape of nested literal lists or tuples.
-        Example: np.array([[1, 2], [3, 4]]) has a shape of (2, 2).
-
-        Args:
-            node: The AST node representing literal collections.
-
-        Returns:
-            A tuple representing the multi-dimensional structure.
-        """
+    def literal_shape(self, node: ast.AST) -> Shape | ShapeState | None:
+        """Calculate the recursive shape of nested literal lists or tuples."""
         if isinstance(node, ast.Name):
-            shape = self.env.get_shape(node.id)
-            return shape
-        if isinstance(node, ast.Name):
-            return None
+            return self.env.get_shape(node.id)
         if isinstance(node, ast.Constant):
-            return ()
+            return Shape(())
         if not isinstance(node, (ast.List, ast.Tuple)):
             return None
         if not node.elts:
-            return (0,)
+            return Shape((0,))
 
-        current_dim = len(node.elts)
         sub_shape = self.literal_shape(node.elts[0])
-        if sub_shape is ShapeState.UNKNOWN:
-            return ShapeState.UNKNOWN
+        if isinstance(sub_shape, ShapeState):
+            return sub_shape
         if sub_shape is None:
-            return (current_dim,)
-        return (current_dim, *sub_shape)
+            return Shape((len(node.elts),))
+        return Shape((len(node.elts), *sub_shape.dims))
 
-    def slice_dimension_length(self, current_dim: int | str, s: ast.Slice) -> int | str:
-        """Calculates the resulting length of a single dim under a slice operation.
-
-        Args:
-            current_dim: The current dimension size.
-            s: The `ast.Slice` node defining bounds and steps.
-
-        Returns:
-            The new dimension size after slicing.
-        """
-        if not isinstance(current_dim, int):
+    def slice_dimension_length(self, current_dim: int, slice_node: ast.Slice) -> int:
+        """Calculate the length of a dimension after applying a slice."""
+        step_value = (
+            self.dim_value(slice_node.step) if slice_node.step is not None else 1
+        )
+        if not isinstance(step_value, int) or step_value == 0:
             return current_dim
 
-        step_val = self.dim_value(s.step) if s.step is not None else 1
-        if not isinstance(step_val, int) or step_val == 0:
-            return current_dim
-
-        if step_val > 0:
-            start_val = self.dim_value(s.lower) if s.lower is not None else 0
-            stop_val = self.dim_value(s.upper) if s.upper is not None else current_dim
-
-            if not isinstance(start_val, int) or not isinstance(stop_val, int):
+        if step_value > 0:
+            start_value = (
+                self.dim_value(slice_node.lower) if slice_node.lower is not None else 0
+            )
+            stop_value = (
+                self.dim_value(slice_node.upper)
+                if slice_node.upper is not None
+                else current_dim
+            )
+            if not isinstance(start_value, int) or not isinstance(stop_value, int):
                 return current_dim
 
             start = max(
                 0,
-                (
-                    current_dim + start_val
-                    if start_val < 0
-                    else min(start_val, current_dim)
-                ),
+                current_dim + start_value
+                if start_value < 0
+                else min(start_value, current_dim),
             )
             stop = max(
                 0,
-                current_dim + stop_val if stop_val < 0 else min(stop_val, current_dim),
+                current_dim + stop_value
+                if stop_value < 0
+                else min(stop_value, current_dim),
             )
-            effective_len = math.ceil((stop - start) / step_val)
+            length = math.ceil((stop - start) / step_value)
         else:
-            start_val = (
-                self.dim_value(s.lower) if s.lower is not None else current_dim - 1
+            start_value = (
+                self.dim_value(slice_node.lower)
+                if slice_node.lower is not None
+                else current_dim - 1
             )
-            stop_val = self.dim_value(s.upper) if s.upper is not None else -1
-
-            if not isinstance(start_val, int) or not isinstance(stop_val, int):
+            stop_value = (
+                self.dim_value(slice_node.upper) if slice_node.upper is not None else -1
+            )
+            if not isinstance(start_value, int) or not isinstance(stop_value, int):
                 return current_dim
 
             start = (
-                max(-1, current_dim + start_val)
-                if start_val < 0
-                else min(start_val, current_dim - 1)
+                max(-1, current_dim + start_value)
+                if start_value < 0
+                else min(start_value, current_dim - 1)
             )
             stop = (
-                max(-1, current_dim + stop_val)
-                if stop_val < -1
-                else min(stop_val, current_dim)
+                max(-1, current_dim + stop_value)
+                if stop_value < -1
+                else min(stop_value, current_dim)
             )
-            effective_len = math.ceil((start - stop) / abs(step_val))
+            length = math.ceil((start - stop) / abs(step_value))
 
-        return max(0, effective_len)
+        return max(0, length)
