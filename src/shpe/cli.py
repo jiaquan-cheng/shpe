@@ -5,7 +5,13 @@ import sys
 from pathlib import Path
 
 from shpe.checker import Checker
-from shpe.environment import ScalarValue, ShapeState, Tensor, ValueState
+from shpe.environment import (
+    AbstractObject,
+    ScalarValue,
+    ShapeState,
+    Tensor,
+    ValueState,
+)
 
 try:
     __version__ = importlib.metadata.version("shpe")
@@ -25,7 +31,7 @@ def main() -> None:
     parser.add_argument(
         "--show-shapes",
         action="store_true",
-        help="Display inferred NumPy shapes for all variables",
+        help="Display inferred shapes, scalar values, and object attributes",
     )
     args = parser.parse_args()
 
@@ -33,17 +39,20 @@ def main() -> None:
     all_errors: list[str] = []
     all_shapes: dict[Path, dict[str, Tensor]] = {}
     all_scalars: dict[Path, dict[str, ScalarValue]] = {}
+    all_objects: dict[Path, dict[str, AbstractObject | None]] = {}
 
     for filepath in files:
-        file_errors, shapes, scalars = _process_file(filepath)
+        file_errors, shapes, scalars, objects = _process_file(filepath)
         all_errors.extend(file_errors)
         if shapes:
             all_shapes[filepath] = shapes
         if scalars:
             all_scalars[filepath] = scalars
+        if any(abstract_object is not None for abstract_object in objects.values()):
+            all_objects[filepath] = objects
 
-    if args.show_shapes and all_shapes:
-        _print_shape_report(all_shapes, all_scalars)
+    if args.show_shapes and (all_shapes or all_scalars or all_objects):
+        _print_shape_report(all_shapes, all_scalars, all_objects)
 
     for err in all_errors:
         print(err)
@@ -88,6 +97,7 @@ def _process_file(
     list[str],
     dict[str, Tensor],
     dict[str, ScalarValue],
+    dict[str, AbstractObject | None],
 ]:
     """Processes a single source file, running syntax checks and shape analysis.
 
@@ -96,7 +106,7 @@ def _process_file(
 
     Returns:
         A tuple containing a list of formatted error messages,
-        the extracted shapes dictionary, and the extracted scalars dictionary.
+        the extracted shapes, scalars, and object dictionaries.
     """
     errors: list[str] = []
     try:
@@ -105,7 +115,7 @@ def _process_file(
         tree = ast.parse(code, filename=str(filepath))
     except SyntaxError as e:
         errors.append(f"{filepath}:{e.lineno}: [SyntaxError] {e.msg} ")
-        return errors, {}, {}
+        return errors, {}, {}, {}
 
     checker = Checker()
     checker.visit(tree)
@@ -134,25 +144,34 @@ def _process_file(
         msg = error["message"]
         errors.append(f"{filepath}:{line}: [{code}] {msg}")
 
-    return errors, checker.env.shapes, checker.env.scalar_values
+    return (
+        errors,
+        checker.env.shapes,
+        checker.env.scalar_values,
+        checker.env.objects,
+    )
 
 
 def _print_shape_report(
     all_shapes: dict[Path, dict[str, Tensor]],
     all_scalars: dict[Path, dict[str, ScalarValue]],
+    all_objects: dict[Path, dict[str, AbstractObject | None]],
 ) -> None:
     """Prints a formatted report of all inferred shapes and scalar values across files.
 
     Args:
         all_shapes: Mapping of file paths to their symbol shape definitions.
         all_scalars: Mapping of file paths to their tracked scalar variables.
+        all_objects: Mapping of file paths to their tracked object instances.
     """
-    print("\n-------- Symbol State (Shapes & Scalars) --------")
+    print("\n-------- Symbol State (Shapes, Scalars & Objects) --------")
 
-    for filepath in sorted(all_shapes.keys(), key=str):
+    filepaths = set(all_shapes) | set(all_scalars) | set(all_objects)
+    for filepath in sorted(filepaths, key=str):
         print(f"\n{filepath}:")
-        symbols = all_shapes[filepath]
+        symbols = all_shapes.get(filepath, {})
         scalars = all_scalars.get(filepath, {})
+        objects = all_objects.get(filepath, {})
 
         if scalars:
             print("  Scalars:")
@@ -180,8 +199,7 @@ def _print_shape_report(
 
             if symbols_with_unknown_shape:
                 print(
-                    "    - unknown shape (tainted) for: "
-                    f"{', '.join(symbols_with_unknown_shape)}"
+                    f"    - unknown shape for: {', '.join(symbols_with_unknown_shape)}"
                 )
             if symbols_with_undefined_shape:
                 print(
@@ -189,10 +207,66 @@ def _print_shape_report(
                     f"{', '.join(symbols_with_undefined_shape)}"
                 )
 
-        if not symbols and not scalars:
+        tracked_objects = [
+            (name, abstract_object)
+            for name, abstract_object in sorted(objects.items())
+            if abstract_object is not None
+        ]
+        if tracked_objects:
+            print("  Objects:")
+            seen_objects: set[int] = set()
+            for name, abstract_object in tracked_objects:
+                if id(abstract_object) in seen_objects:
+                    continue
+                _print_object_attributes(name, abstract_object, 4, seen_objects)
+
+        if not symbols and not scalars and not tracked_objects:
             print("  - (no symbols tracked)")
 
     print("\n" + "-" * 30 + "\n")
+
+
+def _print_object_attributes(
+    name: str,
+    abstract_object: AbstractObject,
+    indent: int,
+    seen_objects: set[int],
+) -> None:
+    """Print an object and its tracked attributes, including nested objects."""
+    prefix = " " * indent
+    print(f"{prefix}- {name} ({abstract_object.class_def.name}):", end="")
+    object_id = id(abstract_object)
+    if object_id in seen_objects:
+        print(" (already shown)")
+        return
+    seen_objects.add(object_id)
+    print()
+
+    for attribute, value in sorted(abstract_object.attributes.items()):
+        attribute_prefix = " " * (indent + 2)
+        if isinstance(value, Tensor):
+            shape = value.shape
+            if shape is ShapeState.UNKNOWN:
+                description = "unknown shape"
+            elif shape is ShapeState.UNDEFINED:
+                description = "undefined shape"
+            else:
+                description = str(shape)
+            print(f"{attribute_prefix}- {attribute}: {description}")
+        elif isinstance(value, ScalarValue):
+            scalar = value.value
+            if scalar is ValueState.UNKNOWN:
+                description = "unknown"
+            elif scalar is ValueState.UNDEFINED:
+                description = "undefined"
+            else:
+                description = str(scalar)
+            print(f"{attribute_prefix}- {attribute} = {description}")
+        elif isinstance(value, AbstractObject):
+            _print_object_attributes(attribute, value, indent + 2, seen_objects)
+        else:
+            description = "unknown" if value is ValueState.UNKNOWN else "undefined"
+            print(f"{attribute_prefix}- {attribute}: {description}")
 
 
 if __name__ == "__main__":

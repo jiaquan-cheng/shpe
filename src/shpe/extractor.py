@@ -2,7 +2,7 @@ import ast
 import math
 
 from shpe.diagnostics import Diagnostics, ErrorCode
-from shpe.environment import Environment, Shape, ShapeState, ValueState
+from shpe.environment import Environment, ScalarValue, Shape, ShapeState, ValueState
 
 
 class Extractor:
@@ -31,10 +31,20 @@ class Extractor:
                 return None
             return -int(value)
 
-        if not isinstance(node, ast.Name):
+        if isinstance(node, ast.Name):
+            scalar = self.env.get_scalar(node.id)
+        elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+            attribute_value = self.env.get_attribute(node.value.id, node.attr)
+            scalar = (
+                attribute_value if isinstance(attribute_value, ScalarValue) else None
+            )
+            if attribute_value is ValueState.UNKNOWN:
+                return ShapeState.UNKNOWN
+            if attribute_value is ValueState.UNDEFINED:
+                return ShapeState.UNDEFINED
+        else:
             return None
 
-        scalar = self.env.get_scalar(node.id)
         if scalar is None:
             return None
         scalar_value = scalar.value
@@ -49,7 +59,8 @@ class Extractor:
             self.diagnostics.error(
                 node,
                 ErrorCode.VALUE,
-                f"Scalar variable '{node.id}' must be an integer, got {scalar_value}.",
+                f"Scalar variable '{ast.unparse(node)}' must be an integer, "
+                f"got {scalar_value}.",
             )
             return None
         return int(scalar_value)

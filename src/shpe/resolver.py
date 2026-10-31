@@ -3,7 +3,15 @@ from collections.abc import Callable
 from typing import Any, Protocol
 
 from shpe.diagnostics import Diagnostics, ErrorCode
-from shpe.environment import Environment, Shape, ShapeState
+from shpe.environment import (
+    AbstractObject,
+    Environment,
+    ScalarValue,
+    Shape,
+    ShapeState,
+    Tensor,
+    ValueState,
+)
 from shpe.extractor import Extractor
 from shpe.handlers import Registry
 
@@ -13,7 +21,7 @@ class StatementWalker(Protocol):
 
 
 class Resolver:
-    """The catch-all shape resolver. It routes the node to the correct handler."""
+    """Resolve expression shapes and analyze calls to user-defined code."""
 
     def __init__(
         self,
@@ -26,6 +34,8 @@ class Resolver:
         self.env: Environment = env
         self.diagnostics: Diagnostics = diagnostics
         self.active_calls: set[str] = set()
+        self.methods_analyzed_for_hints: set[tuple[int, str]] = set()
+        self.initialized_instances: dict[int, AbstractObject] = {}
         self.registry = Registry(self.extractor, self.diagnostics, self.env, self)
         self.walker: StatementWalker = walker
 
@@ -78,26 +88,34 @@ class Resolver:
         return None
 
     def call_shape(self, node: ast.Call) -> Shape | ShapeState | None:
-        """Infers the shape of a function or method call node.
-        Handles both user-defined function and NumPy functions.
+        """Infer a call's shape using user-defined code or a registered handler.
 
         Args:
             node: The `ast.Call` node representing the function invocation.
 
         Returns:
-            The inferred shape tuple, or None if the function is uninferrable.
+            The inferred shape or state, or None when the call is unsupported.
         """
+        func_name = ast.unparse(node.func)
+
+        # Resolve methods on tracked instances before matching library handlers.
         if isinstance(node.func, ast.Attribute) and isinstance(
             node.func.value, ast.Name
         ):
-            pass
-
-        func_name = ast.unparse(node.func)
+            abstract_object = self.env.get_object(node.func.value.id)
+            if abstract_object is not None:
+                method = self._find_class_method(
+                    abstract_object.class_def, node.func.attr
+                )
+                if method is not None:
+                    return self._analyze_instance_method_call(
+                        node, method, abstract_object
+                    )
 
         # Check if it's a user-defined function call
         function = self.env.get_function(func_name)
         if function is not None:
-            return self.user_function_call(node, function)
+            return self._analyze_function_call(node, function)
 
         for suffix in self.call_handlers:
             if func_name.endswith(suffix):
@@ -114,6 +132,17 @@ class Resolver:
         Returns:
             The transformed shape tuple, or None if uninferrable.
         """
+        if isinstance(node.value, ast.Name):
+            abstract_value = self.env.get_attribute(node.value.id, node.attr)
+            if isinstance(abstract_value, Tensor):
+                return abstract_value.shape
+            if isinstance(abstract_value, ValueState):
+                return (
+                    ShapeState.UNKNOWN
+                    if abstract_value is ValueState.UNKNOWN
+                    else ShapeState.UNDEFINED
+                )
+
         handler = self.attr_handlers.get(node.attr)
         if handler:
             return handler(node)
@@ -143,16 +172,141 @@ class Resolver:
             return handler(node, left_shape, right_shape)
         return None
 
-    def user_function_def(self, node: ast.FunctionDef) -> Shape | ShapeState | None:
-        """Handels user-defined function calls.
+    # User-defined function and method analysis
+    def initialize_instance(
+        self, node: ast.Call, class_def: ast.ClassDef, abstract_object: AbstractObject
+    ) -> None:
+        """Analyze `__init__` and populate the instance's abstract attributes."""
+        initializer = self._find_class_method(class_def, "__init__")
+        if initializer is not None:
+            self._analyze_instance_method_call(node, initializer, abstract_object)
+        self.initialized_instances[id(abstract_object)] = abstract_object
 
-        Args:
-            node: The `ast.Call` node representing the invocation.
-            func_node: The `ast.FunctionDef` node of the target function.
+    @staticmethod
+    def _find_class_method(
+        class_def: ast.ClassDef, method_name: str
+    ) -> ast.FunctionDef | None:
+        """Find a method defined directly on a class."""
+        return next(
+            (
+                statement
+                for statement in class_def.body
+                if isinstance(statement, ast.FunctionDef)
+                and statement.name == method_name
+            ),
+            None,
+        )
 
-        Returns:
-            The inferred return shape tuple, or None if uninferrable.
-        """
+    def _analyze_instance_method_call(
+        self, node: ast.Call, method: ast.FunctionDef, abstract_object: AbstractObject
+    ) -> Shape | ShapeState | None:
+        """Analyze a method call with `self` bound to its abstract instance."""
+        if not method.args.args:
+            return None
+
+        active_call = f"{id(abstract_object)}:{method.name}"
+        if active_call in self.active_calls:
+            return None
+
+        self.active_calls.add(active_call)
+        self.env.push_child()
+        hints_were_active = self.diagnostics.active_hint_collection
+        method_key = (id(abstract_object.class_def), method.name)
+        has_instance_state = (
+            method.name == "__init__"
+            or id(abstract_object) in self.initialized_instances
+        )
+        collect_method_hints = has_instance_state and (
+            method_key not in self.methods_analyzed_for_hints
+        )
+        if collect_method_hints:
+            self.methods_analyzed_for_hints.add(method_key)
+            self.diagnostics.activate_hints()
+        else:
+            self.diagnostics.deactivate_hints()
+        try:
+            parameters = method.args.args
+            self.env.set_object(parameters[0].arg, abstract_object)
+            defaults = method.args.defaults
+            num_required = len(parameters) - len(defaults)
+            keyword_arguments = {
+                keyword.arg: keyword.value
+                for keyword in node.keywords
+                if keyword.arg is not None
+            }
+
+            for parameter_index, parameter in enumerate(parameters[1:], start=1):
+                argument = None
+                positional_index = parameter_index - 1
+                if positional_index < len(node.args):
+                    argument = node.args[positional_index]
+                elif parameter.arg in keyword_arguments:
+                    argument = keyword_arguments[parameter.arg]
+                elif parameter_index >= num_required:
+                    argument = defaults[parameter_index - num_required]
+
+                self._bind_method_parameter(parameter.arg, argument)
+
+            return self._infer_function_body_return_shape(method.body)
+        finally:
+            self.env.pop_child()
+            self.active_calls.remove(active_call)
+            if hints_were_active:
+                self.diagnostics.activate_hints()
+            else:
+                self.diagnostics.deactivate_hints()
+
+    def _bind_method_parameter(
+        self, parameter_name: str, argument: ast.AST | None
+    ) -> None:
+        """Bind one method argument to abstract local state."""
+        if argument is None:
+            self.env.set_object(parameter_name, None)
+            self.env.set_shape(parameter_name, ShapeState.UNKNOWN)
+            self.env.set_scalar(parameter_name, ValueState.UNKNOWN)
+            return
+
+        abstract_value: AbstractObject | ScalarValue | Tensor | ValueState | None = None
+        if isinstance(argument, ast.Name):
+            abstract_value = self.env.get_object(argument.id)
+            if abstract_value is None:
+                abstract_value = self.env.get_scalar(argument.id)
+            if abstract_value is None:
+                shape = self.env.get_shape(argument.id)
+                if isinstance(shape, (Shape, ShapeState)):
+                    abstract_value = Tensor(shape)
+        elif isinstance(argument, ast.Attribute) and isinstance(
+            argument.value, ast.Name
+        ):
+            abstract_value = self.env.get_attribute(argument.value.id, argument.attr)
+        elif isinstance(argument, ast.Constant) and isinstance(
+            argument.value, (int, float)
+        ):
+            abstract_value = ScalarValue(argument.value)
+
+        self.env.set_object(
+            parameter_name,
+            abstract_value if isinstance(abstract_value, AbstractObject) else None,
+        )
+        if isinstance(abstract_value, Tensor):
+            self.env.set_shape(parameter_name, abstract_value)
+        elif isinstance(abstract_value, ScalarValue):
+            self.env.set_shape(parameter_name, Shape(()))
+            self.env.set_scalar(parameter_name, abstract_value)
+        elif abstract_value is not None:
+            self.env.set_shape(parameter_name, ShapeState.UNKNOWN)
+            self.env.set_scalar(parameter_name, ValueState.UNKNOWN)
+        else:
+            shape = self.shape(argument)
+            self.env.set_shape(
+                parameter_name,
+                shape if shape is not None else ShapeState.UNKNOWN,
+            )
+
+    def analyze_function_definition(
+        self, node: ast.FunctionDef
+    ) -> Shape | ShapeState | None:
+        """Analyze a function body in an isolated scope for definition-time hints."""
 
         func_name = node.name
 
@@ -162,32 +316,24 @@ class Resolver:
 
         self.active_calls.add(func_name)
 
-        # seperates local and gloabl variables
+        # Keep function-local bindings separate from the caller's scope.
         self.env.push_child()
 
         try:
-            self.bind_function_arguments(None, node)
+            self._bind_function_parameters(None, node)
 
             if node.returns:
                 return self.extractor.annotation_shape(node.returns)
 
-            return self.function_body_shape(node.body)
+            return self._infer_function_body_return_shape(node.body)
         finally:
             self.env.pop_child()
             self.active_calls.remove(func_name)
 
-    def user_function_call(
+    def _analyze_function_call(
         self, node: ast.Call, func_node: ast.FunctionDef
     ) -> Shape | ShapeState | None:
-        """Handels user-defined function calls.
-
-        Args:
-            node: The `ast.Call` node representing the invocation.
-            func_node: The `ast.FunctionDef` node of the target function.
-
-        Returns:
-            The inferred return shape tuple, or None if uninferrable.
-        """
+        """Analyze a function call in an isolated scope and infer its return shape."""
 
         func_name = func_node.name
 
@@ -197,26 +343,30 @@ class Resolver:
 
         self.active_calls.add(func_name)
 
-        # seperates local and gloabl variables
+        # Keep function-local bindings separate from the caller's scope.
         self.env.push_child()
+        hints_were_active = self.diagnostics.active_hint_collection
         self.diagnostics.deactivate_hints()
         try:
-            self.bind_function_arguments(node, func_node)
+            self._bind_function_parameters(node, func_node)
 
             if func_node.returns:
                 return self.extractor.annotation_shape(func_node.returns)
 
-            return self.function_body_shape(func_node.body)
+            return self._infer_function_body_return_shape(func_node.body)
         finally:
             self.env.pop_child()
             self.active_calls.remove(func_name)
-            self.diagnostics.activate_hints()
+            if hints_were_active:
+                self.diagnostics.activate_hints()
 
-    def function_body_shape(self, body: list[ast.stmt]) -> Shape | ShapeState | None:
-        """Walks through function body statements and tracks the final return shape.
+    def _infer_function_body_return_shape(
+        self, body: list[ast.stmt]
+    ) -> Shape | ShapeState | None:
+        """Visit a function body and infer the shape of its final return value.
 
         Args:
-            body: A list of AST statement nodes inside the function definition.
+            body: Statements inside the function definition.
 
         Returns:
             The inferred return shape tuple, or None.
@@ -230,15 +380,14 @@ class Resolver:
                 self.diagnostics.hint(stmt, inferred_return_shape)
         return inferred_return_shape
 
-    def bind_function_arguments(
+    def _bind_function_parameters(
         self, node: ast.Call | None, func_node: ast.FunctionDef
     ) -> None:
-        """Binds positional, default, and annotated arg shapes to the local func scope.
+        """Bind call arguments, defaults, and annotations to function parameters.
 
         Args:
-            node: The `ast.Call` node supplying the argument values.
-            If `None`, no arguments are provided.
-            func_node: The `ast.FunctionDef` node being invoked.
+            node: The call supplying arguments, or None during definition analysis.
+            func_node: The function whose parameters are being bound.
         """
         args_args = func_node.args.args
         defaults = func_node.args.defaults

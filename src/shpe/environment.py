@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ast
 from collections.abc import Iterator, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import TypedDict, overload
 
@@ -58,12 +58,18 @@ class ScalarValue:
 class AbstractObject:
     name: str
     class_def: ast.ClassDef
+    attributes: dict[str, Tensor | ScalarValue | AbstractObject | ValueState] = field(
+        default_factory=dict
+    )
+
+
+AbstractValue = Tensor | ScalarValue | AbstractObject | ValueState
 
 
 class EnvironmentFrame(TypedDict):
     shapes: dict[str, Tensor]
     scalar_values: dict[str, ScalarValue]
-    objects: dict[str, AbstractObject]
+    objects: dict[str, AbstractObject | None]
     functions: dict[str, ast.FunctionDef]
     modules: dict[str, str]
     classes: dict[str, ast.ClassDef]
@@ -83,7 +89,7 @@ class Environment:
         return self.stack[-1]["scalar_values"]
 
     @property
-    def objects(self) -> dict[str, AbstractObject]:
+    def objects(self) -> dict[str, AbstractObject | None]:
         return self.stack[-1]["objects"]
 
     @property
@@ -129,6 +135,9 @@ class Environment:
                 return module
         return None
 
+    def is_module_alias(self, name: str) -> bool:
+        return any(name in frame["modules"].values() for frame in reversed(self.stack))
+
     def get_class(self, name: str) -> ast.ClassDef | None:
         for frame in reversed(self.stack):
             class_def = frame["classes"].get(name)
@@ -138,10 +147,15 @@ class Environment:
 
     def get_object(self, name: str) -> AbstractObject | None:
         for frame in reversed(self.stack):
-            abstract_object = frame["objects"].get(name)
-            if abstract_object is not None:
-                return abstract_object
+            if name in frame["objects"]:
+                return frame["objects"][name]
         return None
+
+    def get_attribute(self, object_name: str, attribute: str) -> AbstractValue | None:
+        abstract_object = self.get_object(object_name)
+        if abstract_object is None:
+            return None
+        return abstract_object.attributes.get(attribute)
 
     def set_shape(self, name: str, shape: Shape | ShapeState | Tensor) -> None:
         tensor = shape if isinstance(shape, Tensor) else Tensor(shape)
@@ -163,8 +177,17 @@ class Environment:
         """Sets a class definition in the current environment."""
         self.stack[-1]["classes"][name] = class_def
 
-    def set_object(self, name: str, abstract_object: AbstractObject) -> None:
+    def set_object(self, name: str, abstract_object: AbstractObject | None) -> None:
         self.stack[-1]["objects"][name] = abstract_object
+
+    def set_attribute(
+        self, object_name: str, attribute: str, value: AbstractValue
+    ) -> bool:
+        abstract_object = self.get_object(object_name)
+        if abstract_object is None:
+            return False
+        abstract_object.attributes[attribute] = value
+        return True
 
     def push_child(self) -> None:
         """Creates a new child environment for local variables and shapes."""

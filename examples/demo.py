@@ -56,6 +56,23 @@ def recursive_function(n):
         return np.array([n]) + recursive_function(n - 1)
 
 
+# infers classes and variables inside object instances
+class Batch:
+    def __init__(self, data, steps):
+        self.data = data
+        self.steps = steps
+
+    def expand(self):
+        self.data = np.expand_dims(self.data, 1)
+
+
+values = np.zeros((2, 3))
+batch = Batch(values, 3)
+batch.expand()
+batch.expand()
+batch_data = batch.data
+
+
 recursive = recursive_function(3)
 
 # not supported control flow

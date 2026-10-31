@@ -2,6 +2,7 @@ from .creation_cases import CREATION_CASES
 from .context_cases import CONTEXT_CASES
 from .annotation_cases import ANNOTATION_CASES
 from .math_cases import MATH_CASES
+from .object_cases import OBJECT_CASES
 from .shape_cases import SHAPE_CASES
 
 __all__ = [
@@ -9,5 +10,6 @@ __all__ = [
     "CONTEXT_CASES",
     "ANNOTATION_CASES",
     "MATH_CASES",
+    "OBJECT_CASES",
     "SHAPE_CASES",
 ]

@@ -58,7 +58,8 @@ Pass files or directories (`*.py`). `--show-shapes` prints inferred shapes and s
 - Array creation (`np.array`, `np.zeros`, `np.ones`, random helpers, …)
 - `Annotated[np.ndarray, (rows, cols)]` vs the inferred expression
 - Element-wise `+ - * /` (broadcast) and `@` (matmul)
-- Simple user functions and scalars used as dimensions
+- Subset of NumPy functions (`reshape`, `transpose`, `sum`, ...)
+- Simple user functions and classes
 
 If `shpe` is uncertain, it does not infer a shape. No control flow (`if` / `for` / `while`), no recursion, and only a subset of NumPy. Inplace updates such as `a.resize(...)` are not modeled.
 

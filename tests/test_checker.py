@@ -7,13 +7,43 @@ import pytest
 import torch
 
 from shpe.checker import Checker
-from shpe.environment import Shape
+from shpe.environment import ScalarValue, Shape, Tensor
 from tests.checker_cases import (
     CONTEXT_CASES,
     CREATION_CASES,
     MATH_CASES,
+    OBJECT_CASES,
     SHAPE_CASES,
 )
+
+
+def assert_runtime_value(
+    code: str, label: str, runtime_value: object, static_value: object | None
+) -> None:
+    if hasattr(runtime_value, "shape"):
+        assert isinstance(static_value, Tensor), (
+            f"Checker did not infer tensor value '{label}'.\nSnippet:\n{code}"
+        )
+        assert isinstance(static_value.shape, Shape), (
+            f"Checker could not infer the shape of '{label}'.\nSnippet:\n{code}"
+        )
+        actual_shape = tuple(runtime_value.shape)
+        assert static_value.shape.dims == actual_shape, (
+            f"  Snippet:\n{code}\n"
+            f"  Value:    {label}\n"
+            f"  Predicted: {static_value.shape.dims}\n"
+            f"  Actual:    {actual_shape}"
+        )
+    elif isinstance(runtime_value, (int, float)) and not isinstance(
+        runtime_value, bool
+    ):
+        assert isinstance(static_value, ScalarValue), (
+            f"Checker did not track scalar value '{label}'.\nSnippet:\n{code}"
+        )
+        assert static_value.value == runtime_value, (
+            f"Checker inferred the wrong value for '{label}': "
+            f"predicted {static_value.value}, actual {runtime_value}."
+        )
 
 
 def checker_runtime_oracle(code: str) -> None:
@@ -50,16 +80,35 @@ def checker_runtime_oracle(code: str) -> None:
             f"  Checker errors: {checker.errors}"
         )
 
-    for var, static_shape in checker.shapes.items():
-        if var in runtime_namespace:
-            runtime_val = runtime_namespace[var]
-            if hasattr(runtime_val, "shape") and isinstance(static_shape.shape, Shape):
-                assert static_shape.shape.dims == tuple(runtime_val.shape), (
-                    f"  Snippet:\n{cleaned_code}\n"
-                    f"  Predicted: {static_shape}\n"
-                    f"  Actual:    {runtime_val.shape}\n"
-                    f"  Table:     {checker.shapes}"
-                )
+    class_names = {
+        node.name for node in ast.walk(tree) if isinstance(node, ast.ClassDef)
+    }
+    for name, runtime_value in runtime_namespace.items():
+        if name in checker.shapes and hasattr(runtime_value, "shape"):
+            assert_runtime_value(
+                cleaned_code, name, runtime_value, checker.shapes[name]
+            )
+
+        if type(runtime_value).__name__ not in class_names:
+            continue
+
+        abstract_object = checker.env.get_object(name)
+        assert abstract_object is not None, (
+            f"Checker did not track object '{name}' of class "
+            f"'{type(runtime_value).__name__}'.\nSnippet:\n{cleaned_code}"
+        )
+        abstract_attributes = abstract_object.attributes
+        assert isinstance(abstract_attributes, dict), (
+            f"Checker did not track attributes for object '{name}'.\n"
+            f"Snippet:\n{cleaned_code}"
+        )
+        for attribute, value in vars(runtime_value).items():
+            assert_runtime_value(
+                cleaned_code,
+                f"{name}.{attribute}",
+                value,
+                abstract_attributes.get(attribute),
+            )
 
 
 @pytest.mark.parametrize(
@@ -91,4 +140,9 @@ def test_checker_math(code: str) -> None:
     SHAPE_CASES,
 )
 def test_checker_shape(code: str) -> None:
+    checker_runtime_oracle(code)
+
+
+@pytest.mark.parametrize("code", OBJECT_CASES)
+def test_checker_custom_objects(code: str) -> None:
     checker_runtime_oracle(code)

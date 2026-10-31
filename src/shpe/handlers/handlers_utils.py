@@ -44,7 +44,7 @@ def infer_call_target(
     if (
         isinstance(node.func, ast.Attribute)
         and isinstance(node.func.value, ast.Name)
-        and node.func.value.id in env.modules.values()
+        and env.is_module_alias(node.func.value.id)
     ):
         return resolver.shape(node.args[0]), list(node.args[1:])
 
