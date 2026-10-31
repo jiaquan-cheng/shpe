@@ -2,7 +2,9 @@ const { LanguageClient } = require('vscode-languageclient/node');
 const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
+const semver = require('semver');
+const extensionVersion = require('./package.json').version;
 
 let client;
 
@@ -24,13 +26,41 @@ function getPythonPath(workspaceRoot) {
     return process.platform === 'win32' ? 'python' : 'python3';
 }
 
-function verifyPackageInstalled(pythonPath) {
+function getInstalledPackageVersion(pythonPath) {
     try {
-        execSync(`"${pythonPath}" -c "import shpe"`, { stdio: 'ignore' });
-        return true;
+        return execFileSync(
+            pythonPath,
+            ['-c', "import importlib.metadata; import shpe; print(importlib.metadata.version('shpe'))"],
+            { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+        ).trim();
     } catch (error) {
-        return false;
+        return null;
     }
+}
+
+function isPackageVersionOlder(installedVersion, editorVersion) {
+    const toComparableVersion = version => {
+        const release = semver.coerce(version);
+        if (!release) return null;
+
+        const publicVersion = version.split('+', 1)[0];
+        const prerelease = publicVersion.match(/(alpha|a|beta|b|preview|pre|rc|c|dev)[-_.]?(\d*)$/i);
+        if (!prerelease) return release.version;
+
+        const label = prerelease[1].toLowerCase();
+        const normalizedLabel = label === 'a' || label === 'alpha'
+            ? 'a'
+            : label === 'b' || label === 'beta'
+                ? 'b'
+                : label === 'dev'
+                    ? '0.dev'
+                    : 'rc';
+        return `${release.version}-${normalizedLabel}.${prerelease[2] || '0'}`;
+    };
+
+    const installed = toComparableVersion(installedVersion);
+    const editor = toComparableVersion(editorVersion);
+    return installed !== null && editor !== null && semver.lt(installed, editor);
 }
 
 function activate(context) {
@@ -39,7 +69,9 @@ function activate(context) {
     
     const pythonPath = getPythonPath(workspaceRoot);
 
-    if (!verifyPackageInstalled(pythonPath)) {
+    const installedVersion = getInstalledPackageVersion(pythonPath);
+
+    if (!installedVersion) {
         vscode.window.showErrorMessage(
             `The 'shpe' package is not installed in the selected Python environment (${pythonPath}). ` +
             "Please install it (e.g. 'pip install shpe').",
@@ -50,6 +82,13 @@ function activate(context) {
             }
         });
         return; 
+    }
+
+    if (isPackageVersionOlder(installedVersion, extensionVersion)) {
+        vscode.window.showWarningMessage(
+            `The installed 'shpe' package version (${installedVersion}) is older than this VS Code extension version (${extensionVersion}). ` +
+            `Update it with '${pythonPath} -m pip install --upgrade shpe'.`
+        );
     }
 
     const serverOptions = {

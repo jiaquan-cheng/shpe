@@ -9,6 +9,10 @@ dependencies = [
     "pygls>=2.1.1",
 ]
 
+[project.urls]
+Homepage = "https://github.com/jiaquan-cheng/shpe"
+Repository = "https://github.com/jiaquan-cheng/shpe"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
