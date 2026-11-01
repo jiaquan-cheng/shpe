@@ -153,6 +153,7 @@ jobs:
         run: make pycharm-package
 
       - name: Publish PyCharm plugin to Marketplace
+        working-directory: editors/pycharm
         run: ./gradlew publishPlugin
         env:
           PUBLISH_TOKEN: ${{ secrets.JETBRAINS_TOKEN }}
